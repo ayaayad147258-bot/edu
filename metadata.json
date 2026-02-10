@@ -1,0 +1,7 @@
+{
+  "name": "Educators Academy Platform",
+  "description": "A comprehensive educational platform for students and parents, featuring AI-powered schedule generation and course management.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
