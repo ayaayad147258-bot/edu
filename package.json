@@ -3,10 +3,11 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "homepage": "https://ayaayad147258-bot.github.io/edu",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@google/genai": "^1.40.0",
