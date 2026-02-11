@@ -104,7 +104,12 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
                     {(() => {
                       const renderedKeys = new Set<string>();
                       return day.slots.map(slot => {
-                        const key = day.day + slot.subject + slot.time;
+                        // Create a robust unique key by trimming and lowercasing components
+                        const safeDay = (day.day || '').trim();
+                        const safeSubject = (slot.subject || '').trim();
+                        const safeTime = (slot.time || '').trim();
+                        const key = `${safeDay}-${safeSubject}-${safeTime}`;
+
                         if (renderedKeys.has(key)) return null;
                         renderedKeys.add(key);
 
