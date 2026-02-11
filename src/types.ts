@@ -54,6 +54,7 @@ export interface GradeData {
   name: string;
   stage: Stage;
   schedule: DaySchedule[];
+  ramadanSchedule?: DaySchedule[]; // New field for Ramadan
   teachers: string[];
   courses: string[];
 }

@@ -17,6 +17,13 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
   const [selectedMedia, setSelectedMedia] = useState<CourseMedia | null>(null);
   const [bookingTarget, setBookingTarget] = useState<{ name: string, type: 'مدرس' | 'كورس' | 'حصة' } | null>(null);
 
+  const [showRamadan, setShowRamadan] = useState(false);
+
+  // Determine which schedule to show
+  const activeSchedule = (showRamadan && grade.ramadanSchedule && grade.ramadanSchedule.length > 0)
+    ? grade.ramadanSchedule
+    : grade.schedule;
+
   const gradeTeachers = teachers.filter(t => grade.teachers.includes(t.id));
   const gradeCourses = courses.filter(c => grade.courses.includes(c.id));
 
@@ -94,50 +101,75 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
 
         <div className="p-8 md:p-14 text-right">
           {activeTab === 'schedule' && (
-            <div className="grid grid-cols-1 md:grid-cols-7 gap-6 animate-in slide-in-from-bottom-8 duration-500">
-              {grade.schedule.map((day, idx) => (
-                <div key={idx} className="flex flex-col gap-4">
-                  <div className="bg-[#0a192f] text-white py-4 rounded-3xl text-center font-black shadow-xl">
-                    {day.day}
-                  </div>
-                  <div className="space-y-4">
-                    {(() => {
-                      const renderedKeys = new Set<string>();
-                      return day.slots.map(slot => {
-                        // Create a robust unique key by trimming and lowercasing components
-                        const safeDay = (day.day || '').trim();
-                        const safeSubject = (slot.subject || '').trim();
-                        const safeTime = (slot.time || '').trim();
-                        const key = `${safeDay}-${safeSubject}-${safeTime}`;
-
-                        if (renderedKeys.has(key)) return null;
-                        renderedKeys.add(key);
-
-                        const teacher = teachers.find(t => t.id === slot.teacherId);
-                        return (
-                          <div
-                            key={slot.id}
-                            onClick={() => teacher && setSelectedTeacher(teacher)}
-                            className={`${slot.color} p-6 rounded-[2rem] shadow-sm border border-black/5 flex flex-col gap-3 transform hover:scale-[1.05] hover:shadow-xl transition-all cursor-pointer`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-3xl">{slot.icon || '📖'}</span>
-                              {teacher && <span className="text-[10px] bg-white/40 backdrop-blur-md px-3 py-1 rounded-full font-black uppercase text-gray-900">أ/ {teacher.name.split(' ')[1] || teacher.name}</span>}
-                            </div>
-                            <div>
-                              <div className="font-black text-2xl text-gray-900 leading-tight">{slot.subject}</div>
-                              <div className="text-sm font-bold opacity-70 mt-1">{slot.time}</div>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                    {day.slots.length === 0 && (
-                      <div className="text-gray-200 text-center py-10 italic text-sm border-2 border-dashed border-gray-100 rounded-3xl">مساحة حرّة</div>
-                    )}
-                  </div>
+            <div>
+              {/* Ramadan Toggle */}
+              {grade.ramadanSchedule && grade.ramadanSchedule.length > 0 && (
+                <div className="flex justify-center mb-8">
+                  <button
+                    onClick={() => setShowRamadan(!showRamadan)}
+                    className={`relative px-8 py-3 rounded-full font-black text-lg transition-all flex items-center gap-3 shadow-lg ${showRamadan ? 'bg-[#f97316] text-white' : 'bg-[#0a192f] text-white hover:bg-[#10b981]'}`}
+                  >
+                    <span>{showRamadan ? '🌙 عرض الجدول الأساسي' : '🌙 عرض جدول رمضان'}</span>
+                    {showRamadan && <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                    </span>}
+                  </button>
                 </div>
-              ))}
+              )}
+
+              {showRamadan && (
+                <div className="text-center mb-6 animate-in fade-in zoom-in">
+                  <h2 className="text-3xl font-black text-[#f97316]">🌙 جدول شهر رمضان المبارك</h2>
+                  <p className="text-gray-500 font-bold mt-2">كل عام وأنتم بخير - مواعيد مخففة</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-7 gap-6 animate-in slide-in-from-bottom-8 duration-500">
+                {activeSchedule.map((day, idx) => (
+                  <div key={idx} className="flex flex-col gap-4">
+                    <div className="bg-[#0a192f] text-white py-4 rounded-3xl text-center font-black shadow-xl">
+                      {day.day}
+                    </div>
+                    <div className="space-y-4">
+                      {(() => {
+                        const renderedKeys = new Set<string>();
+                        return day.slots.map(slot => {
+                          // Create a robust unique key by trimming and lowercasing components
+                          const safeDay = (day.day || '').trim();
+                          const safeSubject = (slot.subject || '').trim();
+                          const safeTime = (slot.time || '').trim();
+                          const key = `${safeDay}-${safeSubject}-${safeTime}`;
+
+                          if (renderedKeys.has(key)) return null;
+                          renderedKeys.add(key);
+
+                          const teacher = teachers.find(t => t.id === slot.teacherId);
+                          return (
+                            <div
+                              key={slot.id}
+                              onClick={() => teacher && setSelectedTeacher(teacher)}
+                              className={`${slot.color} p-6 rounded-[2rem] shadow-sm border border-black/5 flex flex-col gap-3 transform hover:scale-[1.05] hover:shadow-xl transition-all cursor-pointer`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-3xl">{slot.icon || '📖'}</span>
+                                {teacher && <span className="text-[10px] bg-white/40 backdrop-blur-md px-3 py-1 rounded-full font-black uppercase text-gray-900">أ/ {teacher.name.split(' ')[1] || teacher.name}</span>}
+                              </div>
+                              <div>
+                                <div className="font-black text-2xl text-gray-900 leading-tight">{slot.subject}</div>
+                                <div className="text-sm font-bold opacity-70 mt-1">{slot.time}</div>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                      {day.slots.length === 0 && (
+                        <div className="text-gray-200 text-center py-10 italic text-sm border-2 border-dashed border-gray-100 rounded-3xl">مساحة حرّة</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

@@ -41,9 +41,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const [aiInput, setAiInput] = useState('');
   const [scheduleAiInput, setScheduleAiInput] = useState(''); // for AI Schedule Tab
-  const [scheduleSubTab, setScheduleSubTab] = useState<'ai' | 'manual'>('ai');
+  const [scheduleSubTab, setScheduleSubTab] = useState<'ai' | 'manual' | 'ramadan'>('ai');
   const [manualScheduleGradeId, setManualScheduleGradeId] = useState('');
   const [manualScheduleData, setManualScheduleData] = useState<DaySchedule[]>([]);
+
+  // Ramadan State
+  const [ramadanScheduleGradeId, setRamadanScheduleGradeId] = useState('');
+  const [ramadanScheduleData, setRamadanScheduleData] = useState<DaySchedule[]>([]);
 
   useEffect(() => {
     if (manualScheduleGradeId) {
@@ -54,6 +58,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
     }
   }, [manualScheduleGradeId, grades]);
+
+  // Effect for Ramadan Data
+  useEffect(() => {
+    if (ramadanScheduleGradeId) {
+      const grade = grades.find(g => g.id === ramadanScheduleGradeId);
+      if (grade) {
+        setRamadanScheduleData(JSON.parse(JSON.stringify(grade.ramadanSchedule || [])));
+      }
+    }
+  }, [ramadanScheduleGradeId, grades]);
 
   const [selectedGradeForAi, setSelectedGradeForAi] = useState('');
 
@@ -540,18 +554,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="bg-white rounded-[3rem] shadow-2xl p-10 animate-in fade-in border border-gray-100">
           <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <h2 className="text-3xl font-black text-[#0a192f]">إدارة الجدول الدراسي 🗓️</h2>
-            <div className="flex bg-gray-100 p-1 rounded-2xl">
+            <div className="flex justify-center gap-4 mb-8">
               <button
                 onClick={() => setScheduleSubTab('ai')}
-                className={`px-6 py-3 rounded-xl font-bold transition-all ${scheduleSubTab === 'ai' ? 'bg-[#0a192f] text-white shadow-lg' : 'text-gray-500 hover:bg-white'}`}
+                className={`px-6 py-3 rounded-2xl font-black transition-all ${scheduleSubTab === 'ai' ? 'bg-[#10b981] text-white shadow-lg' : 'bg-white text-gray-500 hover:bg-gray-100'}`}
               >
-                ✨ إنشاء بالذكاء الاصطناعي
+                🤖 المُنشئ الذكي (AI)
               </button>
               <button
                 onClick={() => setScheduleSubTab('manual')}
-                className={`px-6 py-3 rounded-xl font-bold transition-all ${scheduleSubTab === 'manual' ? 'bg-[#0a192f] text-white shadow-lg' : 'text-gray-500 hover:bg-white'}`}
+                className={`px-6 py-3 rounded-2xl font-black transition-all ${scheduleSubTab === 'manual' ? 'bg-[#0a192f] text-white shadow-lg' : 'bg-white text-gray-500 hover:bg-gray-100'}`}
               >
-                🛠️ البناء اليدوي
+                🛠️ المُنشئ اليدوي
+              </button>
+              <button
+                onClick={() => setScheduleSubTab('ramadan')}
+                className={`px-6 py-3 rounded-2xl font-black transition-all ${scheduleSubTab === 'ramadan' ? 'bg-[#f97316] text-white shadow-lg' : 'bg-white text-gray-500 hover:bg-gray-100'}`}
+              >
+                🌙 جدول رمضان
               </button>
             </div>
           </div>
