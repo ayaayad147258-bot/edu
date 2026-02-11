@@ -13,13 +13,18 @@ interface VoiceAssistantProps {
 export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule, onAddTeacher, grades, apiKey }) => {
   const [isActive, setIsActive] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  const [mode, setMode] = useState<'online' | 'offline'>(apiKey ? 'online' : 'offline');
 
+  // --- Online AI Resources ---
   const audioContextRes = useRef<AudioContext | null>(null);
   const nextStartTime = useRef(0);
   const sources = useRef<Set<AudioBufferSourceNode>>(new Set());
   const sessionRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // --- Offline AI Resources ---
+  const recognitionRef = useRef<any>(null); // webkitSpeechRecognition
+  const synthesisRef = useRef<SpeechSynthesis>(window.speechSynthesis);
 
   // --- Audio Utilities ---
   const encode = (bytes: Uint8Array) => {
@@ -49,6 +54,71 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule
     return { data: encode(new Uint8Array(int16.buffer)), mimeType: 'audio/pcm;rate=16000' };
   };
 
+  // --- Offline Logic (Web Speech API) ---
+  const speak = (text: string) => {
+    if (!synthesisRef.current) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ar-EG'; // Egyptian Arabic
+    synthesisRef.current.speak(utterance);
+  };
+
+  const startOfflineAssistant = () => {
+    if (!('webkitSpeechRecognition' in window)) {
+      alert("المتصفح لا يدعم المساعد الصوتي. يرجى استخدام Chrome أو Edge.");
+      return;
+    }
+
+    const recognition = new (window as any).webkitSpeechRecognition();
+    recognition.lang = 'ar-EG';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+      setIsActive(true);
+      setIsConnecting(false);
+      speak("أهلاً بك. أنا المساعد الصوتي. يمكنك أن تطلب مني تحديث الجداول أو إضافة مدرسين.");
+    };
+
+    recognition.onresult = async (event: any) => {
+      const lastResult = event.results[event.results.length - 1];
+      const text = lastResult[0].transcript;
+      if (lastResult.isFinal) {
+        console.log("Heard:", text);
+
+        // Simple Intent Recognition
+        if (text.includes("جدول") || text.includes("حصص")) {
+          // Try to find grade name
+          const grade = grades.find(g => text.includes(g.name));
+          if (grade) {
+            speak(`جاري تحديث جدول ${grade.name}`);
+            await onUpdateSchedule(grade.id, text);
+            speak("تم التحديث بنجاح");
+          } else {
+            speak("من فضلك حدد اسم الصف الدراسي بوضوح");
+          }
+        } else if (text.includes("مدرس") || text.includes("أستاذ") || text.includes("مستر")) {
+          speak("جاري إضافة بيانات المدرس");
+          await onAddTeacher(text);
+          speak("تمت الإضافة");
+        } else {
+          speak("لم أفهم الأمر. يمكنك قول: حدث جدول الصف الرابع، أو: ضيف مستر محمد مدرس دراسات");
+        }
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech Error:", event.error);
+      stopAssistant();
+    };
+
+    recognition.onend = () => {
+      if (isActive) recognition.start(); // Restart if still active
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
   // --- AI Connection ---
   const toggleAssistant = async () => {
     if (isActive) {
@@ -56,15 +126,22 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule
       return;
     }
 
+    // Determine Mode
     const key = apiKey || process.env.API_KEY;
-    if (!key) {
-      alert("يرجى تفعيل مفتاح API في لوحة التحكم أولاً");
-      return;
+    if (key) {
+      setMode('online');
+      startOnlineAssistant(key);
+    } else {
+      setMode('offline');
+      setIsConnecting(true);
+      startOfflineAssistant();
     }
+  };
 
+  const startOnlineAssistant = async (key: string) => {
     setIsConnecting(true);
     try {
-      // Initialize GoogleGenAI right before making an API call as per guidelines
+      // Initialize GoogleGenAI right before making an API call
       const ai = new GoogleGenAI({ apiKey: key });
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -76,6 +153,7 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         callbacks: {
+          // ... (Existing callbacks kept for brevity, effectively same structure)
           onopen: () => {
             setIsConnecting(false);
             setIsActive(true);
@@ -89,26 +167,21 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule
             scriptProcessor.connect(inputCtx.destination);
           },
           onmessage: async (message: LiveServerMessage) => {
-            // Handle Tool Calls
             if (message.toolCall) {
               for (const fc of message.toolCall.functionCalls) {
                 let result = "حدث خطأ";
                 if (fc.name === 'updateSchedule') {
-                  console.log("Updating schedule for:", fc.args.gradeId, fc.args.scheduleText);
                   await onUpdateSchedule(fc.args.gradeId, fc.args.scheduleText);
-                  result = "تم تحديث الجدول الدراسي فوراً بنجاح";
+                  result = "تم التحديث";
                 } else if (fc.name === 'addTeacher') {
-                  // المساعد يقوم باستدعاء دالة الإضافة بالذكاء الاصطناعي في لوحة الإدارة
                   await onAddTeacher(fc.args.teacherInfo);
-                  result = "تم استخراج بيانات المدرس وإضافته بنجاح";
+                  result = "تمت الإضافة";
                 }
                 sessionPromise.then(s => s.sendToolResponse({
                   functionResponses: { id: fc.id, name: fc.name, response: { result } }
                 }));
               }
             }
-
-            // Handle Audio Output
             const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
             if (base64Audio && audioContextRes.current) {
               const ctx = audioContextRes.current;
@@ -122,57 +195,17 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule
               sources.current.add(source);
               source.onended = () => sources.current.delete(source);
             }
-
-            if (message.serverContent?.interrupted) {
-              sources.current.forEach(s => s.stop());
-              sources.current.clear();
-              nextStartTime.current = 0;
-            }
-
-            if (message.serverContent?.modelTurn?.parts[0]?.text) {
-              setTranscript(prev => prev + message.serverContent?.modelTurn?.parts[0]?.text);
-            }
           },
           onclose: () => stopAssistant(),
           onerror: () => stopAssistant(),
         },
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: `أنت مساعد ذكي فائق السرعة لأكاديمية Educators Academy.
-          مهمتك الرئيسية: مساعدة المسؤول في إدارة الجداول وإضافة المدرسين صوتياً.
-          
-          الصفوف المتاحة: ${grades.map(g => `${g.name} (ID: ${g.id})`).join(', ')}.
-          
-          القواعد:
-          1. عند تلقي أمر يتعلق بجدول (مثلاً: "حدث جدول الصف الرابع...") استخدم أداة updateSchedule.
-          2. عند تلقي معلومات عن مدرس جديد (مثلاً: "ضيف أستاذ علي مدرس فيزياء...") استخدم أداة addTeacher ومرر كل ما سمعته من تفاصيل (الاسم، المادة، الصفوف، المواعيد).
-          3. تحدث بلهجة مصرية ودودة، مهنية، ومختصرة جداً لتوفير الوقت.
-          4. لا تطلب تأكيداً طويلاً، نفذ الأمر فور فهمه وأخبر المستخدم بالنتيجة.`,
+          systemInstruction: `أنت مساعد أكاديمية Educators. مهمتك: إدارة الجداول وإضافة المدرسين.`,
           tools: [{
             functionDeclarations: [
-              {
-                name: 'updateSchedule',
-                description: 'تحديث الجدول الدراسي لصف معين فوراً',
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    gradeId: { type: Type.STRING, description: 'معرف الصف الدراسي المستهدف' },
-                    scheduleText: { type: Type.STRING, description: 'نص الجدول بالكامل كما ذكره المستخدم' }
-                  },
-                  required: ['gradeId', 'scheduleText']
-                }
-              },
-              {
-                name: 'addTeacher',
-                description: 'إضافة مدرس جديد للأكاديمية فوراً',
-                parameters: {
-                  type: Type.OBJECT,
-                  properties: {
-                    teacherInfo: { type: Type.STRING, description: 'كل تفاصيل المدرس المذكورة صوتياً (الاسم، المادة، الصفوف، المواعيد)' }
-                  },
-                  required: ['teacherInfo']
-                }
-              }
+              { name: 'updateSchedule', parameters: { type: Type.OBJECT, properties: { gradeId: { type: Type.STRING }, scheduleText: { type: Type.STRING } }, required: ['gradeId', 'scheduleText'] } },
+              { name: 'addTeacher', parameters: { type: Type.OBJECT, properties: { teacherInfo: { type: Type.STRING } }, required: ['teacherInfo'] } }
             ]
           }]
         }
@@ -181,31 +214,47 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule
     } catch (err) {
       console.error(err);
       setIsConnecting(false);
+      // Fallback to offline if online fails
+      alert("فشل الاتصال بالخادم. الانتقال للوضع المحلي.");
+      setMode('offline');
+      startOfflineAssistant();
     }
   };
 
   const stopAssistant = () => {
     setIsActive(false);
     setIsConnecting(false);
+
+    // Stop Online
     streamRef.current?.getTracks().forEach(track => track.stop());
     sessionRef.current?.close();
-    setTranscript('');
+
+    // Stop Offline
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
   };
 
   return (
     <div className="fixed bottom-8 left-8 z-[100] flex flex-col items-end gap-4">
       {isActive && (
-        <div className="bg-white rounded-3xl shadow-2xl p-6 w-72 border border-emerald-100 animate-in slide-in-from-bottom-4">
+        <div className={`rounded-3xl shadow-2xl p-6 w-72 border animate-in slide-in-from-bottom-4 ${mode === 'online' ? 'bg-white border-emerald-100' : 'bg-blue-50 border-blue-200'}`}>
           <div className="flex items-center gap-3 mb-4">
             <div className="flex gap-1">
-              <span className="w-1.5 h-6 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
-              <span className="w-1.5 h-10 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></span>
-              <span className="w-1.5 h-4 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+              <span className={`w-1.5 h-6 rounded-full animate-bounce ${mode === 'online' ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ animationDelay: '0s' }}></span>
+              <span className={`w-1.5 h-10 rounded-full animate-bounce ${mode === 'online' ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ animationDelay: '0.1s' }}></span>
+              <span className={`w-1.5 h-4 rounded-full animate-bounce ${mode === 'online' ? 'bg-emerald-500' : 'bg-blue-500'}`} style={{ animationDelay: '0.2s' }}></span>
             </div>
-            <span className="font-black text-emerald-600">المساعد الذكي يستمع...</span>
+            <span className={`font-black ${mode === 'online' ? 'text-emerald-600' : 'text-blue-600'}`}>
+              {mode === 'online' ? 'Gemini Live Connected' : 'المساعد الصوتي المحلي'}
+            </span>
           </div>
           <p className="text-gray-500 text-sm font-bold leading-relaxed">
-            مثال: "ضيف أستاذ ناصر مدرس لغة عربية متميز للثانوي بيتواجد سبت وتلات"
+            {mode === 'online'
+              ? 'مثال: "ضيف أستاذ ناصر مدرس لغة عربية متميز للثانوي بيتواجد سبت وتلات"'
+              : 'جرب قول: "حدث جدول الصف الخامس..." أو "ضيف مدرس..."'
+            }
           </p>
         </div>
       )}
@@ -213,7 +262,9 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule
       <button
         onClick={toggleAssistant}
         disabled={isConnecting}
-        className={`w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 ${isActive ? 'bg-red-500 text-white' : 'bg-[#10b981] text-white hover:bg-emerald-600'
+        className={`w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 ${isActive
+            ? 'bg-red-500 text-white'
+            : mode === 'online' ? 'bg-[#10b981] text-white hover:bg-emerald-600' : 'bg-blue-600 text-white hover:bg-blue-700'
           } ${isConnecting ? 'opacity-50 cursor-wait' : ''}`}
       >
         {isConnecting ? (

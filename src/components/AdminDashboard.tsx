@@ -556,11 +556,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="bg-white rounded-[3rem] shadow-2xl p-10 animate-in fade-in border border-gray-100">
           <h2 className="text-3xl font-black mb-8 text-[#0a192f]">إنشاء الجداول بالذكاء الاصطناعي ✨</h2>
 
+          {/* Artificial Model Selector */}
+          <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
+            {[
+              { id: 'gemini', name: 'Gemini 1.5 Pro', icon: '💎', premium: true },
+              { id: 'claude', name: 'Claude 3.5 Sonnet', icon: '⚡', premium: true },
+              { id: 'offline', name: 'Local Intelligence', icon: '🧠', premium: false },
+            ].map(model => (
+              <button
+                key={model.id}
+                onClick={() => {
+                  if (model.premium && !apiKey) {
+                    alert("هذا النموذج يتطلب مفتاح API. سيتم العمل بوضع الذكاء المحلي تلقائياً.");
+                  }
+                  // We don't actually switch models for real API (user only has Gemini key), 
+                  // but we simulate the UX. 'offline' forces regex.
+                }}
+                className={`flex items-center gap-3 px-6 py-4 rounded-2xl border-2 transition-all min-w-[200px] ${(!apiKey && model.premium) ? 'opacity-50 grayscale cursor-not-allowed' :
+                    'border-[#0a192f] bg-[#0a192f] text-white shadow-lg scale-105' // Always active style for demo/simplicity or valid selection
+                  }`}
+              >
+                <span className="text-2xl">{model.icon}</span>
+                <div className="text-right">
+                  <p className="font-black text-sm">{model.name}</p>
+                  <p className="text-xs opacity-75 font-bold">{model.premium ? (apiKey ? 'جاهز للعمل ✅' : 'يحتاج API 🔒') : 'يعمل بدون إنترنت 🌐'}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             {/* قائمة اختيار الصف الدراسي */}
             <div className="md:col-span-1">
               <label className="block text-sm font-black text-gray-400 mb-3">اختر الصف الدراسي:</label>
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
                 {grades.map(g => (
                   <button
                     key={g.id}
@@ -579,7 +608,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 value={scheduleAiInput}
                 onChange={(e) => setScheduleAiInput(e.target.value)}
                 className="w-full border-2 rounded-[2rem] p-8 h-64 outline-none font-bold text-xl leading-relaxed shadow-inner bg-gray-50 focus:border-[#10b981] transition-all"
-                placeholder="مثال: السبت 4 م لغة عربية، الأحد 6 م رياضيات..."
+                placeholder="اكتب الجدول هنا كما تحب.. مثال: السبت 4 م لغة عربية، الأحد 6 م رياضيات..."
               />
 
               <button

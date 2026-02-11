@@ -3,7 +3,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { DaySchedule, Teacher } from "../types";
 
 // Helper for fallback parsing
-const parseScheduleRegex = (text: string): DaySchedule[] => {
+// Helper for fallback parsing (Now Exported for Offline Mode)
+export const parseScheduleRegex = (text: string): DaySchedule[] => {
   // Map input variations to Standard Arabic Day Names
   const daysMap: { [key: string]: string } = {
     'الأحد': 'الأحد', 'الاحد': 'الأحد', 'sunday': 'الأحد', 'sun': 'الأحد', 'حد': 'الأحد',
@@ -267,13 +268,64 @@ export const parseScheduleWithAI = async (textInput: string, apiKey?: string): P
   }
 };
 
+// Regex Teacher Parser (Offline Fallback)
+export const parseTeachersRegex = (text: string): Partial<Teacher>[] => {
+  const teachers: Partial<Teacher>[] = [];
+
+  // Attempt 1: Line by line "Name - Subject"
+  const lines = text.split(/\n|,|،/).map(l => l.trim()).filter(l => l.length > 5);
+
+  // Subject Keywords
+  const subjectsMap: Record<string, string> = {
+    'عربي': 'اللغة العربية', 'لغة عربية': 'اللغة العربية',
+    'رياضيات': 'الرياضيات', 'حساب': 'الرياضيات',
+    'علوم': 'العلوم', 'فيزياء': 'العلوم',
+    'انجليزي': 'اللغة الإنجليزية', 'english': 'اللغة الإنجليزية',
+    'دراسات': 'الدراسات الاجتماعية', 'تاريخ': 'الدراسات الاجتماعية',
+  };
+
+  lines.forEach(line => {
+    // Detect "Name" (Common prefixes or just assumption it's at start)
+    const nameMatch = line.match(/(أستاذ|مستر|ميس|أ\/)\s*([\u0600-\u06FF\s]+)/) || [null, '', line.split(' ').slice(0, 2).join(' ')];
+    let name = nameMatch[2] || nameMatch[0] || "مدرس جديد";
+
+    // Detect Subject
+    let subject = "مادة عامة";
+    for (const [key, val] of Object.entries(subjectsMap)) {
+      if (line.includes(key)) {
+        subject = val;
+        break;
+      }
+    }
+
+    // Detect Days
+    const days = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+    const foundDays = days.filter(d => line.includes(d)).join('، ');
+
+    if (name.length > 3) {
+      teachers.push({
+        id: `t-${Math.random()}`,
+        name: name.trim(),
+        subject: subject,
+        availability: foundDays || "متوفر طوال الأسبوع",
+        bio: "تمت إضافته بواسطة المساعد الذكي (بدون إنترنت)",
+        imageUrl: `https://picsum.photos/seed/${Math.random()}/400`,
+        grades: [] // Will depend on context later
+      });
+    }
+  });
+
+  return teachers;
+};
+
 export const parseTeachersWithAI = async (textInput: string, apiKey?: string): Promise<Partial<Teacher>[]> => {
   try {
     const key = apiKey || import.meta.env.VITE_GEMINI_API_KEY;
     if (!key) {
-      console.warn("API Key is missing for teacher parsing.");
-      return [];
+      console.warn("API Key is missing, using Offline Regex Parser.");
+      return parseTeachersRegex(textInput);
     }
+    // ... existing AI logic ...
     const ai = new GoogleGenAI({ apiKey: key });
     const response = await ai.models.generateContent({
       model: 'gemini-1.5-flash',
@@ -314,6 +366,6 @@ export const parseTeachersWithAI = async (textInput: string, apiKey?: string): P
     return JSON.parse(response.text.trim());
   } catch (error) {
     console.error("AI Teacher Parsing Error:", error);
-    return [];
+    return parseTeachersRegex(textInput);
   }
 };
