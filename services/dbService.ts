@@ -1,9 +1,9 @@
 
 import { GradeData, Teacher, Course } from '../types';
 
-// الوصول إلى Firebase المعرف في index.html
-declare var db: any;
-declare var storage: any;
+import { db, storage } from './firebase';
+import { collection, doc, getDocs, writeBatch, setDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 /**
  * وظيفة مساعدة لإزالة القيم undefined من الكائنات قبل إرسالها لـ Firestore
@@ -19,28 +19,28 @@ export const dbService = {
    * رفع أي ملف (صورة، فيديو، PDF) إلى Firebase Storage
    */
   async uploadFile(file: File, path: string): Promise<string> {
-    if (typeof storage === 'undefined') {
+    if (!storage) {
       throw new Error("Firebase Storage is not initialized properly.");
     }
     // مسار فريد للملف لتجنب التكرار
     const extension = file.name.split('.').pop();
     const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}.${extension}`;
-    const storageRef = storage.ref().child(`${path}/${fileName}`);
-    
+    const storageRef = ref(storage, `${path}/${fileName}`);
+
     // بدء الرفع
-    const snapshot = await storageRef.put(file);
+    const snapshot = await uploadBytes(storageRef, file);
     // الحصول على رابط التحميل المباشر
-    return await snapshot.ref.getDownloadURL();
+    return await getDownloadURL(snapshot.ref);
   },
 
   async saveGrades(grades: GradeData[]) {
     localStorage.setItem('academy_grades', JSON.stringify(grades));
-    if (typeof db !== 'undefined') {
+    if (db) {
       try {
-        const batch = db.batch();
+        const batch = writeBatch(db);
         grades.forEach(grade => {
-          const ref = db.collection('grades').doc(grade.id);
-          batch.set(ref, cleanForFirestore(grade));
+          const gradeRef = doc(db, 'grades', grade.id);
+          batch.set(gradeRef, cleanForFirestore(grade));
         });
         await batch.commit();
       } catch (err) {
@@ -48,15 +48,15 @@ export const dbService = {
       }
     }
   },
-  
+
   async saveTeachers(teachers: Teacher[]) {
     localStorage.setItem('academy_teachers', JSON.stringify(teachers));
-    if (typeof db !== 'undefined') {
+    if (db) {
       try {
-        const batch = db.batch();
+        const batch = writeBatch(db);
         teachers.forEach(teacher => {
-          const ref = db.collection('teachers').doc(teacher.id);
-          batch.set(ref, cleanForFirestore(teacher));
+          const teacherRef = doc(db, 'teachers', teacher.id);
+          batch.set(teacherRef, cleanForFirestore(teacher));
         });
         await batch.commit();
       } catch (err) {
@@ -64,15 +64,15 @@ export const dbService = {
       }
     }
   },
-  
+
   async saveCourses(courses: Course[]) {
     localStorage.setItem('academy_courses', JSON.stringify(courses));
-    if (typeof db !== 'undefined') {
+    if (db) {
       try {
-        const batch = db.batch();
+        const batch = writeBatch(db);
         courses.forEach(course => {
-          const ref = db.collection('courses').doc(course.id);
-          batch.set(ref, cleanForFirestore(course));
+          const courseRef = doc(db, 'courses', course.id);
+          batch.set(courseRef, cleanForFirestore(course));
         });
         await batch.commit();
       } catch (err) {
@@ -88,18 +88,18 @@ export const dbService = {
       courses: JSON.parse(localStorage.getItem('academy_courses') || 'null'),
     };
 
-    if (typeof db !== 'undefined') {
+    if (db) {
       try {
         const [gradesSnap, teachersSnap, coursesSnap] = await Promise.all([
-          db.collection('grades').get(),
-          db.collection('teachers').get(),
-          db.collection('courses').get()
+          getDocs(collection(db, 'grades')),
+          getDocs(collection(db, 'teachers')),
+          getDocs(collection(db, 'courses'))
         ]);
 
         const remoteData = {
-          grades: gradesSnap.docs.map((doc: any) => doc.data()) as GradeData[],
-          teachers: teachersSnap.docs.map((doc: any) => doc.data()) as Teacher[],
-          courses: coursesSnap.docs.map((doc: any) => doc.data()) as Course[],
+          grades: gradesSnap.docs.map((doc) => doc.data()) as GradeData[],
+          teachers: teachersSnap.docs.map((doc) => doc.data()) as Teacher[],
+          courses: coursesSnap.docs.map((doc) => doc.data()) as Course[],
         };
 
         if (remoteData.grades.length > 0 || remoteData.teachers.length > 0 || remoteData.courses.length > 0) {

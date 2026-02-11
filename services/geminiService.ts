@@ -176,7 +176,7 @@ const parseScheduleRegex = (text: string): DaySchedule[] => {
 
 export const parseScheduleWithAI = async (textInput: string, apiKey?: string): Promise<DaySchedule[]> => {
   try {
-    const key = apiKey || process.env.API_KEY;
+    const key = apiKey || import.meta.env.VITE_GEMINI_API_KEY;
     if (!key) {
       console.warn("API Key missing, using Smart Context Regex parser.");
       return parseScheduleRegex(textInput);
@@ -240,7 +240,7 @@ export const parseScheduleWithAI = async (textInput: string, apiKey?: string): P
 
 export const parseTeachersWithAI = async (textInput: string, apiKey?: string): Promise<Partial<Teacher>[]> => {
   try {
-    const key = apiKey || process.env.API_KEY;
+    const key = apiKey || import.meta.env.VITE_GEMINI_API_KEY;
     if (!key) {
       console.warn("API Key is missing for teacher parsing.");
       return [];
