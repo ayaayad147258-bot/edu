@@ -253,10 +253,22 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
 
       {/* Teacher Profile Sidepanel */}
       {selectedTeacher && (
-        <div className="fixed inset-0 z-[110] flex justify-end items-center bg-[#0a192f]/90 backdrop-blur-2xl animate-in fade-in p-0 sm:p-6 duration-500">
-          <div className="bg-white h-full sm:h-auto w-full max-w-2xl sm:rounded-[3.5rem] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.4)] animate-in slide-in-from-left duration-700 text-right flex flex-col">
+        <div
+          className="fixed inset-0 z-[110] flex justify-end items-center bg-[#0a192f]/90 backdrop-blur-2xl animate-in fade-in p-0 sm:p-6 duration-500 cursor-pointer"
+          onClick={() => setSelectedTeacher(null)}
+        >
+          <div
+            className="bg-white h-full sm:h-auto w-full max-w-2xl sm:rounded-[3.5rem] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.4)] animate-in slide-in-from-left duration-700 text-right flex flex-col cursor-default relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSelectedTeacher(null)}
+              className="fixed top-6 left-6 z-[120] bg-red-500 hover:bg-red-600 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-2xl border-4 border-white/20 hover:scale-110 transition-all animate-pulse"
+              title="إغلاق"
+            >
+              <span className="text-4xl font-black mb-1">×</span>
+            </button>
             <div className="relative h-80 bg-[#0a192f]">
-              <button onClick={() => setSelectedTeacher(null)} className="absolute top-8 left-8 z-50 bg-black/40 hover:bg-black/60 text-white w-14 h-14 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-lg border border-white/10">✕</button>
               <img src={selectedTeacher.imageUrl} className="w-full h-full object-cover opacity-70" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#0a192f] via-[#0a192f]/40 to-transparent"></div>
               <div className="absolute bottom-10 right-12">
