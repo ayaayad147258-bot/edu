@@ -101,25 +101,32 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
                     {day.day}
                   </div>
                   <div className="space-y-4">
-                    {day.slots.map(slot => {
-                      const teacher = teachers.find(t => t.id === slot.teacherId);
-                      return (
-                        <div
-                          key={slot.id}
-                          onClick={() => teacher && setSelectedTeacher(teacher)}
-                          className={`${slot.color} p-6 rounded-[2rem] shadow-sm border border-black/5 flex flex-col gap-3 transform hover:scale-[1.05] hover:shadow-xl transition-all cursor-pointer`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-3xl">{slot.icon || '📖'}</span>
-                            {teacher && <span className="text-[10px] bg-white/40 backdrop-blur-md px-3 py-1 rounded-full font-black uppercase text-gray-900">أ/ {teacher.name.split(' ')[1] || teacher.name}</span>}
+                    {(() => {
+                      const renderedKeys = new Set<string>();
+                      return day.slots.map(slot => {
+                        const key = day.day + slot.subject + slot.time;
+                        if (renderedKeys.has(key)) return null;
+                        renderedKeys.add(key);
+
+                        const teacher = teachers.find(t => t.id === slot.teacherId);
+                        return (
+                          <div
+                            key={slot.id}
+                            onClick={() => teacher && setSelectedTeacher(teacher)}
+                            className={`${slot.color} p-6 rounded-[2rem] shadow-sm border border-black/5 flex flex-col gap-3 transform hover:scale-[1.05] hover:shadow-xl transition-all cursor-pointer`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-3xl">{slot.icon || '📖'}</span>
+                              {teacher && <span className="text-[10px] bg-white/40 backdrop-blur-md px-3 py-1 rounded-full font-black uppercase text-gray-900">أ/ {teacher.name.split(' ')[1] || teacher.name}</span>}
+                            </div>
+                            <div>
+                              <div className="font-black text-2xl text-gray-900 leading-tight">{slot.subject}</div>
+                              <div className="text-sm font-bold opacity-70 mt-1">{slot.time}</div>
+                            </div>
                           </div>
-                          <div>
-                            <div className="font-black text-2xl text-gray-900 leading-tight">{slot.subject}</div>
-                            <div className="text-sm font-bold opacity-70 mt-1">{slot.time}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                     {day.slots.length === 0 && (
                       <div className="text-gray-200 text-center py-10 italic text-sm border-2 border-dashed border-gray-100 rounded-3xl">مساحة حرّة</div>
                     )}
