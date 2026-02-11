@@ -195,7 +195,7 @@ export const parseScheduleWithAI = async (textInput: string, apiKey?: string): P
       'Sport': { name: 'التربية الرياضية', color: 'bg-orange-100 text-orange-800', icon: '⚽', keywords: ['ألعاب', 'رياضة', 'sport', 'pe'] }
     };
 
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = "gemini-1.5-flash";
 
     const prompt = `
       أنت خبير في تنظيم الجداول الدراسية. مهمتك هي تحويل النص "غير المنظم" إلى مصفوفة JSON مسطحة ومنظمة.
@@ -214,14 +214,16 @@ export const parseScheduleWithAI = async (textInput: string, apiKey?: string): P
       "${textInput}"
     `;
 
-    const result = await model.generateContent({
+    const result = await ai.models.generateContent({
+      model: model,
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
+      config: {
         responseMimeType: "application/json"
       }
     });
 
-    const responseText = result.response.text();
+    const responseText = result.text;
+    if (!responseText) throw new Error("Empty response from AI");
     const rawData = JSON.parse(responseText) as { day: string, subject: string, time: string }[];
 
     // Transform Flat JSON to Nested DaySchedule
