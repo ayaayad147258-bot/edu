@@ -48,6 +48,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Ramadan State
   const [ramadanScheduleGradeId, setRamadanScheduleGradeId] = useState('');
   const [ramadanScheduleData, setRamadanScheduleData] = useState<DaySchedule[]>([]);
+  const [ramadanTextInput, setRamadanTextInput] = useState('');
 
   useEffect(() => {
     if (manualScheduleGradeId) {
@@ -65,6 +66,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const grade = grades.find(g => g.id === ramadanScheduleGradeId);
       if (grade) {
         setRamadanScheduleData(JSON.parse(JSON.stringify(grade.ramadanSchedule || [])));
+        setRamadanTextInput(''); // Reset text input when switching grade
       }
     }
   }, [ramadanScheduleGradeId, grades]);

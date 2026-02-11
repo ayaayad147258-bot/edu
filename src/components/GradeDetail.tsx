@@ -69,13 +69,22 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
       </button>
 
       <div className="bg-white rounded-[3rem] shadow-2xl overflow-hidden mb-12 border border-gray-100 animate-in fade-in zoom-in-95 duration-700">
-        <div className="bg-[#0a192f] p-12 text-white relative overflow-hidden text-right">
+        <div className={`p-12 text-white relative overflow-hidden text-right transition-colors duration-700 ${showRamadan ? 'bg-[#f97316]' : 'bg-[#0a192f]'}`}>
           <div className="relative z-10">
-            <h1 className="text-5xl font-black mb-4">{grade.name}</h1>
-            <p className="text-blue-200/80 text-xl font-medium max-w-2xl">استعرض جدول المواعيد، قائمة المدرسين، والمحتوى التعليمي المتاح لهذا الصف</p>
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-5xl font-black mb-4 flex items-center gap-3">
+                  {grade.name}
+                  {showRamadan && <span>🌙</span>}
+                </h1>
+                <p className={`text-xl font-medium max-w-2xl ${showRamadan ? 'text-orange-100' : 'text-blue-200/80'}`}>
+                  {showRamadan ? 'استعرض مواعيد الحصص خلال شهر رمضان المبارك' : 'استعرض جدول المواعيد، قائمة المدرسين، والمحتوى التعليمي المتاح لهذا الصف'}
+                </p>
+              </div>
+            </div>
           </div>
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[#10b981] rounded-full blur-[140px] opacity-20 -mr-40 -mt-40"></div>
-          <div className="absolute bottom-0 left-0 w-64 h-64 bg-[#f97316] rounded-full blur-[120px] opacity-10 -ml-32 -mb-32"></div>
+          <div className="absolute top-0 right-0 w-80 h-80 bg-white rounded-full blur-[140px] opacity-10 -mr-40 -mt-40"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-black rounded-full blur-[120px] opacity-10 -ml-32 -mb-32"></div>
         </div>
 
         <div className="flex border-b bg-gray-50/50 overflow-x-auto whitespace-nowrap scrollbar-hide">
@@ -104,26 +113,37 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
             <div>
               {/* Ramadan Toggle */}
               {grade.ramadanSchedule && grade.ramadanSchedule.length > 0 && (
-                <div className="flex justify-center mb-8">
-                  <button
-                    onClick={() => setShowRamadan(!showRamadan)}
-                    className={`relative px-8 py-3 rounded-full font-black text-lg transition-all flex items-center gap-3 shadow-lg ${showRamadan ? 'bg-[#f97316] text-white' : 'bg-[#0a192f] text-white hover:bg-[#10b981]'}`}
-                  >
-                    <span>{showRamadan ? '🌙 عرض الجدول الأساسي' : '🌙 عرض جدول رمضان'}</span>
-                    {showRamadan && <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-                    </span>}
-                  </button>
+                <div className="mb-8">
+                  {showRamadan ? (
+                    <div className="bg-orange-50 border-2 border-orange-100 rounded-3xl p-6 flex items-center justify-between animate-in slide-in-from-top-4">
+                      <div className="flex items-center gap-4">
+                        <span className="text-3xl">🌙</span>
+                        <div>
+                          <h3 className="font-black text-xl text-[#f97316]">مواعيد شهر رمضان</h3>
+                          <p className="text-gray-500 font-bold text-sm">يمكنك التبديل بين الجدول العادي وجدول رمضان</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowRamadan(false)}
+                        className="bg-[#f97316] text-white px-6 py-3 rounded-xl font-black hover:bg-orange-700 transition-all shadow-lg active:scale-95"
+                      >
+                        العودة للجدول الدراسي 🔄
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex justify-center">
+                      <button
+                        onClick={() => setShowRamadan(true)}
+                        className="bg-[#f97316] text-white px-8 py-3 rounded-full font-black text-lg shadow-lg hover:bg-orange-600 transition-all active:scale-95 flex items-center gap-2 animate-bounce cursor-pointer"
+                      >
+                        🌙 اضغط هنا لعرض جدول رمضان
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
-              {showRamadan && (
-                <div className="text-center mb-6 animate-in fade-in zoom-in">
-                  <h2 className="text-3xl font-black text-[#f97316]">🌙 جدول شهر رمضان المبارك</h2>
-                  <p className="text-gray-500 font-bold mt-2">كل عام وأنتم بخير - مواعيد مخففة</p>
-                </div>
-              )}
+              {/* {showRamadan && ( ... removed as header covers it ... )} */}
 
               <div className="grid grid-cols-1 md:grid-cols-7 gap-6 animate-in slide-in-from-bottom-8 duration-500">
                 {activeSchedule.map((day, idx) => (
