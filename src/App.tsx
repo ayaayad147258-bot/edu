@@ -109,6 +109,7 @@ const App: React.FC = () => {
         <VoiceAssistant
           onUpdateSchedule={handleVoiceUpdateSchedule}
           onAddTeacher={handleVoiceAddTeacher}
+          onNavigate={(v) => { setView(v); setSelectedStage(null); }}
           grades={grades}
           apiKey={apiKey}
         />
