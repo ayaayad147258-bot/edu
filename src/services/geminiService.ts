@@ -182,58 +182,85 @@ export const parseScheduleWithAI = async (textInput: string, apiKey?: string): P
       return parseScheduleRegex(textInput);
     }
     const ai = new GoogleGenAI({ apiKey: key });
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: `أنت مساعد ذكي يفهم اللهجة المصرية واللغة العربية جيداً.
-      قم بتحويل النص التالي (جدول حصص) إلى تنسيق JSON منظم.
+
+    // Subject Configuration (Reused for AI styling)
+    const subjectConfig: { [key: string]: { name: string, color: string, icon: string, keywords: string[] } } = {
+      'Math': { name: 'الرياضيات', color: 'bg-blue-100 text-blue-800', icon: '📐', keywords: ['رياضيات', 'جبر', 'هندسة', 'حساب', 'math', 'ماث'] },
+      'Science': { name: 'العلوم', color: 'bg-green-100 text-green-800', icon: '🔬', keywords: ['علوم', 'فيزياء', 'kimya', 'science', 'physics', 'chemistry', 'biology', 'أحياء', 'كيمياء', 'ساينس'] },
+      'Arabic': { name: 'اللغة العربية', color: 'bg-emerald-100 text-emerald-800', icon: '📖', keywords: ['عربي', 'لغة عربية', 'arabic', 'نحو', 'نصوص', 'لغه عربيه', 'اللغه العربيه'] },
+      'English': { name: 'اللغة الإنجليزية', color: 'bg-red-100 text-red-800', icon: '🅰️', keywords: ['انجليزي', 'إنجليزي', 'english', 'انقلش'] },
+      'Social': { name: 'الدراسات الاجتماعية', color: 'bg-yellow-100 text-yellow-800', icon: '🌍', keywords: ['دراسات', 'تاريخ', 'جغرافيا', 'social', 'history'] },
+      'Religion': { name: 'التربية الدينية', color: 'bg-purple-100 text-purple-800', icon: '🕌', keywords: ['دين', 'تربية دينية', 'islamic', 'quran', 'قرآن'] },
+      'Art': { name: 'التربية الفنية', color: 'bg-pink-100 text-pink-800', icon: '🎨', keywords: ['رسم', 'art', 'فنية'] },
+      'Sport': { name: 'التربية الرياضية', color: 'bg-orange-100 text-orange-800', icon: '⚽', keywords: ['ألعاب', 'رياضة', 'sport', 'pe'] }
+    };
+
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+    const prompt = `
+      أنت خبير في تنظيم الجداول الدراسية. مهمتك هي تحويل النص "غير المنظم" إلى مصفوفة JSON مسطحة ومنظمة.
       
-      النص: "${textInput}"
+      القواعد الصارمة:
+      1. استخراج: اليوم (day)، المادة (subject)، الوقت (time).
+      2. توحيد أيام الأسبوع: استخدم فقط (السبت، الأحد، الإثنين، الثلاثاء، الأربعاء، الخميس، الجمعة) بالهمزات الصحيحة.
+      3. منع التكرار: إذا تكررت نفس الحصة في نفس اليوم والوقت، اذكرها مرة واحدة فقط.
+      4. تصحيح الأخطاء: صحح أسماء المواد (مثلاً: "ريادات" -> "الرياضيات").
+      5. التنسيق: الناتج يجب أن يكون مصفوفة JSON فقط، ولا شيء غيرها.
       
-      المطلوب:
-      1. مصفوفة من الأيام، ويجب أن تكون أسماء الأيام باللغة العربية (الأحد، الإثنين، الثلاثاء، إلخ).
-      2. كل يوم يحتوي على قائمة "slots" (حصص).
-      3. بيانات الحصة:
-         - subject: اسم المادة باللغة العربية.
-         - time: الوقت بتنسيق عربي (مثل "09:00 ص" أو "04:00 م").
-         - color: لون مناسب من Tailwind (مثال: "bg-blue-100 text-blue-800").
-         - icon: إيموجي مناسب.
-         - id: معرف عشوائي.
-      
-      تعامل بذكاء مع النصوص غير المرتبة أو المكتوبة باللهجة العامية (مثل "ماث"، "ساينس"، "الاتنين").`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              day: { type: Type.STRING },
-              slots: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    id: { type: Type.STRING },
-                    subject: { type: Type.STRING },
-                    time: { type: Type.STRING },
-                    color: { type: Type.STRING },
-                    icon: { type: Type.STRING }
-                  },
-                  required: ['id', 'subject', 'time', 'color', 'icon']
-                }
-              }
-            },
-            required: ['day', 'slots']
-          }
-        }
+      شكل الناتج المطلوب:
+      [{"day": "الأحد", "subject": "اللغة العربية", "time": "04:00 م"}, ...]
+
+      النص المدخل:
+      "${textInput}"
+    `;
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json"
       }
     });
 
-    const text = response.text;
-    if (!text) throw new Error("Empty response from AI");
-    return JSON.parse(text.trim()) as DaySchedule[];
+    const responseText = result.response.text();
+    const rawData = JSON.parse(responseText) as { day: string, subject: string, time: string }[];
+
+    // Transform Flat JSON to Nested DaySchedule
+    const schedule: DaySchedule[] = [];
+    const daysMap: Record<string, DaySchedule> = {};
+
+    rawData.forEach(item => {
+      if (!daysMap[item.day]) {
+        daysMap[item.day] = { day: item.day, slots: [] };
+        schedule.push(daysMap[item.day]);
+      }
+
+      // Auto-Style based on Subject
+      let style = { color: 'bg-gray-100 text-gray-800', icon: '📚' };
+      for (const config of Object.values(subjectConfig)) {
+        if (config.keywords.some(k => item.subject.includes(k) || config.name.includes(item.subject))) {
+          style = config;
+          // Use canonical name if close enough
+          if (!item.subject.includes(config.name) && config.name.includes(item.subject)) {
+            item.subject = config.name;
+          }
+          break;
+        }
+      }
+
+      daysMap[item.day].slots.push({
+        id: `s-${Math.random().toString(36).substr(2, 9)}`,
+        subject: item.subject,
+        time: item.time,
+        color: style.color,
+        icon: style.icon
+      });
+    });
+
+    return schedule;
+
   } catch (error) {
     console.error("AI Schedule Parsing Error:", error);
+    // Fallback to regex parser if AI fails
     return parseScheduleRegex(textInput);
   }
 };

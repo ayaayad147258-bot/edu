@@ -436,28 +436,63 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleUpdateScheduleWithAI = async () => {
-    // 1. التأكد من وجود نص مدخل
-    if (!scheduleAiInput.trim()) return;
+    // 1. Validation
+    if (!scheduleAiInput.trim() || !selectedGradeForAi) {
+      alert("يرجى اختيار الصف وإدخال نص الجدول");
+      return;
+    }
 
-    setIsLoading(true); // تفعيل وضع التحميل
+    setIsLoading(true);
     try {
-      // 2. تجهيز السياق (المرحلة والصف)
+      // 2. Prepare Context and Call AI
       const selectedGrade = grades.find(g => g.id === selectedGradeForAi);
-      const context = selectedGrade ? `[CONTEXT: Grade=${selectedGrade.name}, Stage=${selectedGrade.stage}] ` : '';
+      const context = selectedGrade ? `[الصف: ${selectedGrade.name}]` : '';
 
-      // 3. استدعاء التحليل (مع السياق)
-      const newSchedule = await parseScheduleWithAI(`${context}${scheduleAiInput}`, apiKey);
+      // Get structured nested schedule from AI service
+      const aiGeneratedSchedule = await parseScheduleWithAI(`${context} ${scheduleAiInput}`, apiKey);
 
-      // 4. تحديث مصفوفة الصفوف
-      setGrades(prev => prev.map(g =>
-        g.id === selectedGradeForAi ? { ...g, schedule: newSchedule } : g
-      ));
+      // 3. Smart Merge & Deduplicate
+      setGrades(prev => prev.map(grade => {
+        if (grade.id === selectedGradeForAi) {
+          const currentSchedule = grade.schedule || [];
 
-      alert('تم تحديث الجدول بنجاح! تم تحليل الجدول وربطه بالمرحلة المختارة ✨');
+          // Deep clone to avoid mutation issues
+          const updatedSchedule = [...currentSchedule];
+
+          aiGeneratedSchedule.forEach(aiDay => {
+            // Normalize AI Day Name
+            const normalizedAiDay = aiDay.day.trim();
+
+            // Find existing day or create new
+            let targetDay = updatedSchedule.find(d => d.day.trim() === normalizedAiDay);
+            if (!targetDay) {
+              targetDay = { day: normalizedAiDay, slots: [] };
+              updatedSchedule.push(targetDay);
+            }
+
+            // Merge AI slots into this day, checking for duplicates
+            aiDay.slots.forEach(aiSlot => {
+              const isDuplicate = targetDay!.slots.some(existingSlot =>
+                existingSlot.subject.trim() === aiSlot.subject.trim() &&
+                existingSlot.time.trim() === aiSlot.time.trim()
+              );
+
+              if (!isDuplicate) {
+                targetDay!.slots.push(aiSlot);
+              }
+            });
+          });
+
+          return { ...grade, schedule: updatedSchedule };
+        }
+        return grade;
+      }));
+
+      alert('تم تحديث الجدول بذكاء! تم دمج الحصص الجديدة ومنع التكرار ✨');
       setScheduleAiInput('');
     } catch (err: any) {
-      alert('فشل في تحليل الجدول. حاول صياغة النص بشكل أوضح.');
-      console.error(err);
+      console.error("AI Update Error:", err);
+      alert('حدث خطأ أثناء معالجة البيانات، تأكد من مفتاح API وجودة النص.');
     } finally {
       setIsLoading(false);
     }
