@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<'home' | 'stages' | 'grade' | 'admin' | 'teachers'>('home');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
-  const [apiKey, setApiKey] = useState('');
+  const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
 
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [selectedGrade, setSelectedGrade] = useState<GradeData | null>(null);
@@ -33,10 +33,13 @@ const App: React.FC = () => {
       if (data.teachers && data.teachers.length > 0) setTeachers(data.teachers);
       if (data.courses && data.courses.length > 0) setCourses(data.courses);
 
-      // Check for API Key
+      // Check for API Key (Project IDX / AI Studio)
       if (window.aistudio) {
         const key = await window.aistudio.getKey();
-        if (key) setApiKey(key);
+        if (key) {
+          setApiKey(key);
+          localStorage.setItem('gemini_api_key', key);
+        }
       }
     };
     fetchData();
@@ -228,6 +231,8 @@ const App: React.FC = () => {
             teachers={teachers} setTeachers={setTeachers}
             courses={courses} setCourses={setCourses}
             onLogout={() => setIsAdminAuthenticated(false)}
+            apiKey={apiKey}
+            setApiKey={setApiKey}
           />
         )
       )}

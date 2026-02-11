@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { GradeData, Teacher, Course, Stage, StageSubjects, CourseMedia } from '../types';
+import { GradeData, Teacher, Course, Stage, StageSubjects, CourseMedia, DaySchedule, ScheduleSlot } from '../types';
 import { parseScheduleWithAI, parseTeachersWithAI } from '../services/geminiService';
 import { STAGES, ACADEMY_CONFIG, INITIAL_STAGE_SUBJECTS } from '../constants';
 import { VoiceAssistant } from './VoiceAssistant';
@@ -18,10 +18,12 @@ interface AdminDashboardProps {
   courses: Course[];
   setCourses: React.Dispatch<React.SetStateAction<Course[]>>;
   onLogout: () => void;
+  apiKey: string;
+  setApiKey: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
-  grades, setGrades, teachers, setTeachers, courses, setCourses, onLogout
+  grades, setGrades, teachers, setTeachers, courses, setCourses, onLogout, apiKey, setApiKey
 }) => {
   const [activeTab, setActiveTab] = useState<'ai-schedule' | 'teachers' | 'subjects' | 'courses' | 'settings'>('ai-schedule');
   const [managementSubTab, setManagementSubTab] = useState<'list' | 'add' | 'ai-add'>('list');
@@ -31,8 +33,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [teacherToDelete, setTeacherToDelete] = useState<Teacher | null>(null);
 
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+
   const [stageSubjects, setStageSubjects] = useState<StageSubjects[]>(() => {
     const saved = localStorage.getItem('academy_stage_subjects');
     return saved ? JSON.parse(saved) : INITIAL_STAGE_SUBJECTS;
@@ -40,6 +41,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const [aiInput, setAiInput] = useState('');
   const [scheduleAiInput, setScheduleAiInput] = useState(''); // for AI Schedule Tab
+  const [scheduleSubTab, setScheduleSubTab] = useState<'ai' | 'manual'>('ai');
+  const [manualScheduleGradeId, setManualScheduleGradeId] = useState('');
+  const [manualScheduleData, setManualScheduleData] = useState<DaySchedule[]>([]);
+
+  useEffect(() => {
+    if (manualScheduleGradeId) {
+      const grade = grades.find(g => g.id === manualScheduleGradeId);
+      if (grade) {
+        // Deep clone to separate local editing state from global grades state
+        setManualScheduleData(JSON.parse(JSON.stringify(grade.schedule || [])));
+      }
+    }
+  }, [manualScheduleGradeId, grades]);
+
   const [selectedGradeForAi, setSelectedGradeForAi] = useState('');
 
   const [teacherAiInput, setTeacherAiInput] = useState('');
@@ -78,17 +93,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const allSubjects = Array.from(new Set(stageSubjects.flatMap(s => s.subjects))).sort();
 
+  // useEffect for checking window.aistudio removed as it's handled in App.tsx
   useEffect(() => {
-    const checkKey = async () => {
-      if (window.aistudio) {
-        const key = await window.aistudio.getKey();
-        if (key) {
-          setApiKey(key);
-          setHasApiKey(true);
-        }
-      }
-    };
-    checkKey();
     dbService.saveGrades(grades);
     dbService.saveTeachers(teachers);
     dbService.saveCourses(courses);
@@ -105,7 +111,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const key = await window.aistudio.getKey();
       if (key) {
         setApiKey(key);
-        setHasApiKey(true);
         alert("تم تفعيل مفتاح الـ API بنجاح! يمكنك الآن استخدام المميزات المتقدمة.");
       }
     }
@@ -161,13 +166,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setManagementSubTab('list');
     } catch (err: any) {
       console.error(err);
-      if (err.message?.includes('permission denied') || err.message?.includes('Requested entity was not found')) {
-        alert("فشل في الوصول للذكاء الاصطناعي: يرجى الضغط على زر 'تفعيل خدمات الذكاء الاصطناعي' بالأعلى واختيار مفتاح مدفوع.");
-        if (err.message?.includes('Requested entity was not found')) {
-          setHasApiKey(false);
-        }
+      // Fallback handled by service, just log error or show generic message if needed
+      if (!apiKey) {
+        console.warn("AI Teacher parsing failed (likely due to missing key), falling back to offline regex.");
       } else {
-        alert("خطأ في تحليل البيانات بالذكاء الاصطناعي");
+        alert("حدث خطأ أثناء تحليل البيانات.");
       }
     } finally {
       setIsLoading(false);
@@ -261,16 +264,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const generateAiCover = async () => {
     if (!newCourseData.title) return alert("يرجى كتابة اسم الكورس أولاً");
 
-    if (!hasApiKey) {
-      if (confirm("يتطلب توليد الصور 4K مفتاح API مدفوع. هل تود تفعيله الآن؟")) {
-        await handleSelectApiKey();
-        return;
-      }
+    if (!apiKey) {
+      // Just warn in console, or allow it to fail gracefully
+      console.warn("Attempting 4K image generation without API Key. This will likely fail.");
     }
 
     setIsGeneratingImage(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const ai = new GoogleGenAI({ apiKey: apiKey || '' });
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-image-preview',
         contents: {
@@ -296,13 +297,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
     } catch (err: any) {
       console.error(err);
-      if (err.message?.includes('permission denied') || err.message?.includes('Requested entity was not found')) {
-        alert("خطأ في الصلاحيات: يرجى التأكد من تفعيل مفتاح API مدفوع مرتبط بمشروع GCP مفعل به الفوترة.");
-        if (err.message?.includes('Requested entity was not found')) {
-          setHasApiKey(false);
-        }
-      } else {
-        alert("حدث خطأ أثناء توليد الصورة.");
+      alert("تعذر توليد الصورة (ربما تحتاج مفتاح API مدفوع).");
+      if (err.message?.includes('Requested entity was not found')) {
+        // Removed as state is lifted
       }
     } finally {
       setIsGeneratingImage(false);
@@ -502,21 +499,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-10" dir="rtl">
-      {/* API Key Banner */}
-      {!hasApiKey && (
-        <div className="mb-8 bg-orange-50 border-2 border-orange-200 p-6 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top duration-500">
-          <div className="flex items-center gap-4 text-orange-800">
-            <span className="text-4xl">⚠️</span>
-            <div>
-              <p className="font-black text-lg">خدمات الذكاء الاصطناعي المتقدمة (Gemini Pro) معطلة</p>
-              <p className="font-bold opacity-75">تحتاج لاختيار مفتاح API مدفوع لتتمكن من توليد الصور 4K وتحليل البيانات المتقدمة.</p>
-            </div>
-          </div>
-          <button onClick={handleSelectApiKey} className="bg-orange-500 text-white px-8 py-3 rounded-2xl font-black hover:bg-orange-600 transition-all shadow-xl shadow-orange-500/20 whitespace-nowrap active:scale-95">
-            تفعيل الخدمات الآن ✨
-          </button>
-        </div>
-      )}
+      {/* API Key Banner Removed */}
 
       <VoiceAssistant
         grades={grades}
@@ -528,6 +511,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           setGrades(prev => prev.map(g => g.id === gid ? { ...g, schedule: parsed } : g));
         }}
         onAddTeacher={handleAddTeacherByText}
+        onNavigate={() => { }} // Admin doesn't navigate from here usually, or pass a dummy
       />
 
       <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-6 text-right">
@@ -551,79 +535,226 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
 
-      {/* AI Schedule Creation Tab */}
+      {/* Schedule Tab with Sub-tabs */}
       {activeTab === 'ai-schedule' && (
         <div className="bg-white rounded-[3rem] shadow-2xl p-10 animate-in fade-in border border-gray-100">
-          <h2 className="text-3xl font-black mb-8 text-[#0a192f]">إنشاء الجداول بالذكاء الاصطناعي ✨</h2>
-
-          {/* Artificial Model Selector */}
-          <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
-            {[
-              { id: 'gemini', name: 'Gemini 1.5 Pro', icon: '💎', premium: true },
-              { id: 'claude', name: 'Claude 3.5 Sonnet', icon: '⚡', premium: true },
-              { id: 'offline', name: 'Local Intelligence', icon: '🧠', premium: false },
-            ].map(model => (
+          <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <h2 className="text-3xl font-black text-[#0a192f]">إدارة الجدول الدراسي 🗓️</h2>
+            <div className="flex bg-gray-100 p-1 rounded-2xl">
               <button
-                key={model.id}
-                onClick={() => {
-                  if (model.premium && !apiKey) {
-                    alert("هذا النموذج يتطلب مفتاح API. سيتم العمل بوضع الذكاء المحلي تلقائياً.");
-                  }
-                  // We don't actually switch models for real API (user only has Gemini key), 
-                  // but we simulate the UX. 'offline' forces regex.
-                }}
-                className={`flex items-center gap-3 px-6 py-4 rounded-2xl border-2 transition-all min-w-[200px] ${(!apiKey && model.premium) ? 'opacity-50 grayscale cursor-not-allowed' :
-                    'border-[#0a192f] bg-[#0a192f] text-white shadow-lg scale-105' // Always active style for demo/simplicity or valid selection
-                  }`}
+                onClick={() => setScheduleSubTab('ai')}
+                className={`px-6 py-3 rounded-xl font-bold transition-all ${scheduleSubTab === 'ai' ? 'bg-[#0a192f] text-white shadow-lg' : 'text-gray-500 hover:bg-white'}`}
               >
-                <span className="text-2xl">{model.icon}</span>
-                <div className="text-right">
-                  <p className="font-black text-sm">{model.name}</p>
-                  <p className="text-xs opacity-75 font-bold">{model.premium ? (apiKey ? 'جاهز للعمل ✅' : 'يحتاج API 🔒') : 'يعمل بدون إنترنت 🌐'}</p>
-                </div>
+                ✨ إنشاء بالذكاء الاصطناعي
               </button>
-            ))}
+              <button
+                onClick={() => setScheduleSubTab('manual')}
+                className={`px-6 py-3 rounded-xl font-bold transition-all ${scheduleSubTab === 'manual' ? 'bg-[#0a192f] text-white shadow-lg' : 'text-gray-500 hover:bg-white'}`}
+              >
+                🛠️ البناء اليدوي
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-            {/* قائمة اختيار الصف الدراسي */}
-            <div className="md:col-span-1">
-              <label className="block text-sm font-black text-gray-400 mb-3">اختر الصف الدراسي:</label>
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
-                {grades.map(g => (
+          {/* AI Sub-tab */}
+          {scheduleSubTab === 'ai' && (
+            <div className="animate-in fade-in slide-in-from-top-4">
+              {/* Artificial Model Selector */}
+              <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
+                {[
+                  { id: 'gemini', name: 'Gemini 1.5 Pro', icon: '💎', premium: true },
+                  { id: 'claude', name: 'Claude 3.5 Sonnet', icon: '⚡', premium: true },
+                  { id: 'offline', name: 'Local Intelligence', icon: '🧠', premium: false },
+                ].map(model => (
                   <button
-                    key={g.id}
-                    onClick={() => setSelectedGradeForAi(g.id)}
-                    className={`w-full text-right p-4 rounded-2xl font-bold transition-all border-2 ${selectedGradeForAi === g.id ? 'bg-[#0a192f] text-white border-[#0a192f]' : 'bg-gray-50 text-gray-500 border-transparent hover:border-gray-200'}`}
+                    key={model.id}
+                    onClick={() => {
+                      if (model.premium && !apiKey) {
+                        console.log("Using Local Intelligence (No API Key detected)");
+                      }
+                    }}
+                    className={`flex items-center gap-3 px-6 py-4 rounded-2xl border-2 transition-all min-w-[200px] ${(!apiKey && model.premium) ? 'opacity-50 grayscale cursor-not-allowed' :
+                      'border-[#0a192f] bg-[#0a192f] text-white shadow-lg scale-105'
+                      }`}
                   >
-                    {g.name}
+                    <span className="text-2xl">{model.icon}</span>
+                    <div className="text-right">
+                      <p className="font-black text-sm">{model.name}</p>
+                      <p className="text-xs opacity-75 font-bold">{model.premium ? (apiKey ? 'جاهز للعمل ✅' : 'يحتاج API 🔒') : 'يعمل بدون إنترنت 🌐'}</p>
+                    </div>
                   </button>
                 ))}
               </div>
-            </div>
 
-            {/* منطقة إدخال النص والزر */}
-            <div className="md:col-span-2 space-y-6">
-              <textarea
-                value={scheduleAiInput}
-                onChange={(e) => setScheduleAiInput(e.target.value)}
-                className="w-full border-2 rounded-[2rem] p-8 h-64 outline-none font-bold text-xl leading-relaxed shadow-inner bg-gray-50 focus:border-[#10b981] transition-all"
-                placeholder="اكتب الجدول هنا كما تحب.. مثال: السبت 4 م لغة عربية، الأحد 6 م رياضيات..."
-              />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                {/* AI Grade Selector */}
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-black text-gray-400 mb-3">اختر الصف الدراسي:</label>
+                  <div className="space-y-2 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
+                    {grades.map(g => (
+                      <button
+                        key={g.id}
+                        onClick={() => setSelectedGradeForAi(g.id)}
+                        className={`w-full text-right p-4 rounded-2xl font-bold transition-all border-2 ${selectedGradeForAi === g.id ? 'bg-[#0a192f] text-white border-[#0a192f]' : 'bg-gray-50 text-gray-500 border-transparent hover:border-gray-200'}`}
+                      >
+                        {g.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-              <button
-                onClick={handleUpdateScheduleWithAI}
-                disabled={isLoading}
-                className="w-full bg-[#0a192f] text-white py-6 rounded-[2.5rem] font-black text-2xl shadow-2xl hover:bg-[#10b981] transition-all active:scale-95 flex items-center justify-center gap-4"
-              >
-                {isLoading ? (
-                  <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  'تحديث الجدول بذكاء ✨'
-                )}
-              </button>
+                {/* AI Input Area */}
+                <div className="md:col-span-2 space-y-6">
+                  <textarea
+                    value={scheduleAiInput}
+                    onChange={(e) => setScheduleAiInput(e.target.value)}
+                    className="w-full border-2 rounded-[2rem] p-8 h-64 outline-none font-bold text-xl leading-relaxed shadow-inner bg-gray-50 focus:border-[#10b981] transition-all"
+                    placeholder="اكتب الجدول هنا كما تحب.. مثال: السبت 4 م لغة عربية، الأحد 6 م رياضيات..."
+                  />
+
+                  <button
+                    onClick={handleUpdateScheduleWithAI}
+                    disabled={isLoading}
+                    className="w-full bg-[#0a192f] text-white py-6 rounded-[2.5rem] font-black text-2xl shadow-2xl hover:bg-[#10b981] transition-all active:scale-95 flex items-center justify-center gap-4"
+                  >
+                    {isLoading ? (
+                      <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      'تحديث الجدول بذكاء ✨'
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Manual Builder Sub-tab */}
+          {scheduleSubTab === 'manual' && (
+            <div className="animate-in fade-in slide-in-from-top-4 space-y-8">
+              {/* Grade Selector for Manual */}
+              <div>
+                <label className="block text-sm font-black text-gray-400 mb-3">اختر الصف لتعديل الجدول:</label>
+                <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                  {grades.map(g => (
+                    <button
+                      key={g.id}
+                      onClick={() => setManualScheduleGradeId(g.id)}
+                      className={`px-6 py-3 rounded-xl font-bold transition-all border-2 min-w-fit ${manualScheduleGradeId === g.id ? 'bg-[#0a192f] text-white border-[#0a192f] shadow-lg scale-105' : 'bg-white text-gray-500 border-gray-100 hover:border-gray-200'}`}
+                    >
+                      {g.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {manualScheduleGradeId ? (
+                <div className="bg-gray-50 rounded-[2.5rem] p-6 border border-gray-200">
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-black text-[#0a192f]">جدول الحصص الأسبوعي ✍️</h3>
+                    <button
+                      onClick={() => {
+                        setGrades(prev => prev.map(g => g.id === manualScheduleGradeId ? { ...g, schedule: manualScheduleData } : g));
+                        alert("تم حفظ الجدول بنجاح! ✅");
+                      }}
+                      className="bg-[#10b981] text-white px-8 py-3 rounded-xl font-black shadow-lg hover:bg-emerald-600 transition-all active:scale-95 flex items-center gap-2"
+                    >
+                      <span>💾</span> حفظ التغييرات
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'].map(day => {
+                      const dayData = manualScheduleData.find(d => d.day === day) || { day, slots: [] };
+
+                      return (
+                        <div key={day} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 hover:border-[#0a192f]/20 transition-all">
+                          <div className="flex justify-between items-center mb-4 border-b pb-2">
+                            <h4 className="font-black text-lg text-[#0a192f]">{day}</h4>
+                            <button
+                              onClick={() => {
+                                const newSlot: ScheduleSlot = {
+                                  id: `s-${Date.now()}-${Math.random()}`,
+                                  subject: '',
+                                  time: '',
+                                  color: 'bg-blue-500', // Default
+                                  teacherId: ''
+                                };
+                                const updatedSchedule = [...manualScheduleData];
+                                const existingDayIndex = updatedSchedule.findIndex(d => d.day === day);
+                                if (existingDayIndex >= 0) {
+                                  updatedSchedule[existingDayIndex].slots.push(newSlot);
+                                } else {
+                                  updatedSchedule.push({ day, slots: [newSlot] });
+                                }
+                                setManualScheduleData(updatedSchedule);
+                              }}
+                              className="w-8 h-8 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center font-black hover:bg-blue-100 transition-all"
+                              title="إضافة حصة"
+                            >
+                              +
+                            </button>
+                          </div>
+
+                          <div className="space-y-3">
+                            {dayData.slots.map((slot, sIdx) => (
+                              <div key={slot.id} className="bg-gray-50 p-3 rounded-2xl border border-gray-200 group relative">
+                                <div className="space-y-2">
+                                  <select
+                                    value={slot.subject}
+                                    onChange={(e) => {
+                                      const updatedSchedule = [...manualScheduleData];
+                                      const dIdx = updatedSchedule.findIndex(d => d.day === day);
+                                      updatedSchedule[dIdx].slots[sIdx].subject = e.target.value;
+                                      setManualScheduleData(updatedSchedule);
+                                    }}
+                                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm font-bold outline-none focus:border-[#0a192f]"
+                                  >
+                                    <option value="">اختيار المادة...</option>
+                                    {allSubjects.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                                  </select>
+
+                                  <input
+                                    type="time"
+                                    value={slot.time}
+                                    onChange={(e) => {
+                                      const updatedSchedule = [...manualScheduleData];
+                                      const dIdx = updatedSchedule.findIndex(d => d.day === day);
+                                      updatedSchedule[dIdx].slots[sIdx].time = e.target.value;
+                                      setManualScheduleData(updatedSchedule);
+                                    }}
+                                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm font-bold outline-none focus:border-[#0a192f] text-left"
+                                  />
+                                </div>
+
+                                <button
+                                  onClick={() => {
+                                    const updatedSchedule = [...manualScheduleData];
+                                    const dIdx = updatedSchedule.findIndex(d => d.day === day);
+                                    updatedSchedule[dIdx].slots = updatedSchedule[dIdx].slots.filter(s => s.id !== slot.id);
+                                    setManualScheduleData(updatedSchedule);
+                                  }}
+                                  className="absolute -top-2 -left-2 w-6 h-6 bg-red-100 text-red-500 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all font-black shadow-sm hover:bg-red-500 hover:text-white"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))}
+                            {dayData.slots.length === 0 && (
+                              <p className="text-center text-gray-300 text-xs font-bold py-4">لا توجد حصص</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-20 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
+                  <p className="text-gray-400 font-bold text-xl">👈 اختر صفاً دراسياً من القائمة أعلاه للبدء</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1317,6 +1448,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     onClick={() => {
                       if (!webhookUrl) return alert("يرجى إدخال الرابط أولاً");
                       // Simple Save Confirmation
+                      localStorage.setItem('google_sheet_webhook_url', webhookUrl);
                       alert("تم حفظ الرابط بنجاح! سيتم استخدامه في الحجوزات القادمة.");
                     }}
                     className="w-full bg-[#0a192f] text-white py-4 rounded-2xl font-black hover:bg-[#10b981] transition-all shadow-xl active:scale-95"
@@ -1325,6 +1457,53 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* API Key Settings Section */}
+              <div className="mt-8 border-t pt-8">
+                <div className="flex items-center gap-4 mb-6">
+                  <span className="text-4xl">🔑</span>
+                  <div>
+                    <h2 className="text-2xl font-black text-[#0a192f]">مفتاح الذكاء الاصطناعي (API Key)</h2>
+                    <p className="text-gray-400 font-bold text-sm">إعدادات Gemini AI</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-black text-gray-500 mb-2">Gemini API Key:</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={apiKey}
+                        onChange={(e) => {
+                          setApiKey(e.target.value);
+                          localStorage.setItem('gemini_api_key', e.target.value);
+                        }}
+                        placeholder="AIzaSy..."
+                        className="flex-1 border-2 border-gray-200 rounded-xl p-4 font-bold text-left outline-none focus:border-[#10b981] transition-colors"
+                        dir="ltr"
+                      />
+                      {apiKey && (
+                        <button
+                          onClick={() => {
+                            setApiKey('');
+                            localStorage.removeItem('gemini_api_key');
+                          }}
+                          className="bg-red-50 text-red-500 px-4 rounded-xl font-bold hover:bg-red-100 transition-all"
+                        >
+                          حذف
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2 font-bold">
+                      * يتم حفظ المفتاح محلياً في متصفحك لضمان الخصوصية.
+                      <br />
+                      * يستخدم لتوليد الجداول، إضافة المدرسين، وتحسين النصوص.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         )
