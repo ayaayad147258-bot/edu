@@ -256,12 +256,19 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
         <div className="fixed inset-0 z-[110] flex justify-end items-center bg-[#0a192f]/90 backdrop-blur-2xl animate-in fade-in p-0 sm:p-6 duration-500">
           <div className="bg-white h-full sm:h-auto w-full max-w-2xl sm:rounded-[3.5rem] overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.4)] animate-in slide-in-from-left duration-700 text-right flex flex-col">
             <div className="relative h-80 bg-[#0a192f]">
-              <button onClick={() => setSelectedTeacher(null)} className="absolute top-8 left-8 z-20 bg-white/10 hover:bg-white/30 text-white w-14 h-14 rounded-2xl flex items-center justify-center backdrop-blur-xl transition-all">✕</button>
+              <button onClick={() => setSelectedTeacher(null)} className="absolute top-8 left-8 z-50 bg-black/40 hover:bg-black/60 text-white w-14 h-14 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-lg border border-white/10">✕</button>
               <img src={selectedTeacher.imageUrl} className="w-full h-full object-cover opacity-70" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0a192f] via-[#0a192f]/20 to-transparent"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0a192f] via-[#0a192f]/40 to-transparent"></div>
               <div className="absolute bottom-10 right-12">
                 <h2 className="text-5xl font-black text-white mb-2">{selectedTeacher.name}</h2>
-                <div className="bg-[#10b981] text-white px-6 py-2 rounded-full inline-block font-black text-lg shadow-xl">{selectedTeacher.subject}</div>
+                <div className="flex gap-3">
+                  <div className="bg-[#10b981] text-white px-6 py-2 rounded-full inline-block font-black text-lg shadow-xl">{selectedTeacher.subject}</div>
+                  {selectedTeacher.whatsapp && (
+                    <a href={`https://wa.me/20${selectedTeacher.whatsapp}`} target="_blank" rel="noopener noreferrer" className="bg-[#25D366] text-white px-6 py-2 rounded-full inline-flex items-center gap-2 font-black text-lg shadow-xl hover:bg-[#128C7E] transition-colors">
+                      <span>واتساب</span> 💬
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -275,7 +282,7 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-8 animate-in slide-in-from-bottom-8 duration-700">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-bottom-8 duration-700">
                 <div className="bg-emerald-50/50 p-8 rounded-[2rem] border-2 border-emerald-100 flex flex-col items-center text-center">
                   <span className="text-4xl mb-3">🗓️</span>
                   <p className="text-gray-400 text-xs font-black mb-1 uppercase tracking-tighter">أيام التواجد بالأكاديمية</p>
@@ -288,9 +295,30 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
                 </div>
               </div>
 
-              <button onClick={() => setBookingTarget({ name: selectedTeacher.name, type: 'مدرس' })} className="w-full bg-[#10b981] text-white py-6 rounded-3xl font-black text-2xl shadow-2xl shadow-emerald-500/30 hover:bg-emerald-600 transition-all active:scale-95 mb-4 animate-in slide-in-from-bottom-12 duration-1000">
-                حجز موعد مع الأستاذ الآن 📥
-              </button>
+              {selectedTeacher.hourlyRates && (
+                <div className="animate-in slide-in-from-bottom-8 duration-700 delay-100">
+                  <h3 className="text-2xl font-black text-[#0a192f] mb-6 flex items-center gap-3">
+                    <span className="w-1.5 h-6 bg-[#f97316] rounded-full"></span> أسعار الحصص
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {Object.entries(selectedTeacher.hourlyRates).map(([type, price]) => (
+                      <div key={type} className="flex justify-between items-center bg-orange-50/50 p-6 rounded-2xl border border-orange-100">
+                        <span className="font-bold text-[#0a192f] text-lg">{type}</span>
+                        <span className="font-black text-[#f97316] text-xl">{price} ج.م</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-4 mt-auto">
+                <button onClick={() => setBookingTarget({ name: selectedTeacher.name, type: 'مدرس' })} className="w-full bg-[#10b981] text-white py-6 rounded-3xl font-black text-2xl shadow-2xl shadow-emerald-500/30 hover:bg-emerald-600 transition-all active:scale-95 animate-in slide-in-from-bottom-12 duration-1000">
+                  حجز موعد مع الأستاذ الآن 📥
+                </button>
+                <button onClick={() => setSelectedTeacher(null)} className="w-full bg-gray-100 text-gray-500 py-4 rounded-3xl font-bold text-xl hover:bg-gray-200 transition-all active:scale-95">
+                  إغلاق النافذة ✕
+                </button>
+              </div>
             </div>
           </div>
         </div>
