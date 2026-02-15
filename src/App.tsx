@@ -18,7 +18,7 @@ const App: React.FC = () => {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
-  const [anthropicApiKey, setAnthropicApiKey] = useState(localStorage.getItem('anthropic_api_key') || import.meta.env.VITE_ANTHROPIC_API_KEY || '');
+  const [anthropicApiKey, setAnthropicApiKey] = useState(localStorage.getItem('anthropic_api_key') || '');
 
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [selectedGrade, setSelectedGrade] = useState<GradeData | null>(null);
