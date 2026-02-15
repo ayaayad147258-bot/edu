@@ -47,6 +47,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [scheduleSubTab, setScheduleSubTab] = useState<'ai' | 'manual' | 'ramadan'>('ai');
   const [manualScheduleGradeId, setManualScheduleGradeId] = useState('');
   const [manualScheduleData, setManualScheduleData] = useState<DaySchedule[]>([]);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [missingKeyProvider, setMissingKeyProvider] = useState<'gemini' | 'claude'>('gemini');
 
   // Ramadan State
   const [ramadanScheduleGradeId, setRamadanScheduleGradeId] = useState('');
@@ -456,6 +458,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
+    const effectiveKey = selectedProvider === 'gemini' ? apiKey : anthropicApiKey;
+    if (!effectiveKey) {
+      setMissingKeyProvider(selectedProvider);
+      setShowApiKeyModal(true);
+      return;
+    }
+
+
+
     setIsLoading(true);
     try {
       // 2. Prepare Context and Call AI
@@ -595,14 +606,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     onClick={() => {
                       if (model.id !== 'offline') {
                         setSelectedProvider(model.provider as 'gemini' | 'claude');
-                      }
-                      if (model.premium && !apiKey && model.id === 'gemini') {
-                        console.log("Using Local Intelligence (No Gemini Key detected)");
+
+                        const hasKey = model.provider === 'gemini' ? !!apiKey : !!anthropicApiKey;
+                        if (!hasKey) {
+                          setMissingKeyProvider(model.provider as 'gemini' | 'claude');
+                          setShowApiKeyModal(true);
+                        }
                       }
                     }}
-                    className={`flex items-center gap-3 px-6 py-4 rounded-2xl border-2 transition-all min-w-[200px] ${(model.id === 'gemini' && !apiKey) || (model.id === 'claude' && !anthropicApiKey) ? 'opacity-50 grayscale cursor-not-allowed' :
-                        (selectedProvider === model.provider && model.id !== 'offline') ? 'border-[#10b981] bg-[#0a192f] text-white shadow-lg scale-105' :
-                          'border-[#0a192f] bg-white text-[#0a192f] hover:bg-gray-50'
+                    className={`flex items-center gap-3 px-6 py-4 rounded-2xl border-2 transition-all min-w-[200px] ${(selectedProvider === model.provider && model.id !== 'offline') ? 'border-[#10b981] bg-[#0a192f] text-white shadow-lg scale-105' :
+                      'border-[#0a192f] bg-white text-[#0a192f] hover:bg-gray-50'
                       }`}
                   >
                     <span className="text-2xl">{model.icon}</span>
@@ -1710,6 +1723,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )
       }
+      {/* API Key Modal */}
+      {showApiKeyModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95" dir="rtl">
+            <h3 className="text-2xl font-black text-[#0a192f] mb-4">
+              {missingKeyProvider === 'gemini' ? '💎 مفتاح Gemini' : '⚡ مفتاح Claude'} مطلوب
+            </h3>
+            <p className="text-gray-500 mb-6 font-bold">
+              لتفعيل هذه الميزة، يرجى إدخال مفتاح API الخاص بـ {missingKeyProvider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude'}.
+            </p>
+
+            <input
+              type="password"
+              placeholder={missingKeyProvider === 'gemini' ? 'AIzaSy...' : 'sk-ant-api...'}
+              className="w-full border-2 border-gray-200 rounded-xl p-4 font-bold text-left outline-none focus:border-[#10b981] mb-6"
+              autoFocus
+              dir="ltr"
+              onChange={(e) => {
+                if (missingKeyProvider === 'gemini') {
+                  setApiKey(e.target.value);
+                  localStorage.setItem('gemini_api_key', e.target.value);
+                } else {
+                  setAnthropicApiKey(e.target.value);
+                  localStorage.setItem('anthropic_api_key', e.target.value);
+                }
+              }}
+            />
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowApiKeyModal(false)}
+                className="flex-1 bg-[#0a192f] text-white py-3 rounded-xl font-black hover:bg-[#10b981] transition-all"
+              >
+                حفظ ومتابعة
+              </button>
+              <button
+                onClick={() => setShowApiKeyModal(false)}
+                className="px-6 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 };
