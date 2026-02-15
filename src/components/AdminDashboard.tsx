@@ -144,6 +144,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [manualScheduleData, setManualScheduleData] = useState<DaySchedule[]>([]);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [missingKeyProvider, setMissingKeyProvider] = useState<'gemini' | 'claude'>('gemini');
+  const [uploadProgress, setUploadProgress] = useState(0); // Track upload progress
+
 
   // Ramadan State
   const [ramadanScheduleGradeId, setRamadanScheduleGradeId] = useState('');
@@ -296,9 +298,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setIsUploadingMedia(true);
     try {
       // 1. Upload File
-      const downloadUrl = await dbService.uploadFile(file, `course-content/${editingCourse.id}`);
+      const downloadUrl = await dbService.uploadFile(file, `course-content/${editingCourse.id}`, (progress) => setUploadProgress(progress));
 
       // 2. Create Media Object
+
       const newMedia: CourseMedia = {
         id: Math.random().toString(36).substr(2, 9),
         title: file.name,
@@ -315,10 +318,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       alert("حدث خطأ أثناء رفع الملف. يرجى المحاولة مرة أخرى.");
     } finally {
       setIsUploadingMedia(false);
+      setUploadProgress(0);
     }
   };
 
   const handleManualAddTeacher = async (e: React.FormEvent) => {
+
     e.preventDefault();
     const finalSubject = isAddingNewSubject ? customSubjectName : newTeacher.subject;
 
@@ -329,7 +334,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       let finalImg = newTeacher.imageUrl || `https://picsum.photos/seed/${Date.now()}/400`;
       if (newTeacherImage) {
-        finalImg = await dbService.uploadFile(newTeacherImage, 'teachers');
+        finalImg = await dbService.uploadFile(newTeacherImage, 'teachers', (progress) => setUploadProgress(progress));
       }
 
       const teacherId = `t-${Date.now()}`;
@@ -365,6 +370,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       alert("خطأ أثناء حفظ بيانات المدرس");
     } finally {
       setIsLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -428,7 +434,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       let finalThumb = newCourseData.thumbnailUrl || '';
       if (newCourseImage) {
-        finalThumb = await dbService.uploadFile(newCourseImage, 'courses/thumbs');
+        finalThumb = await dbService.uploadFile(newCourseImage, 'courses/thumbs', (progress) => setUploadProgress(progress));
       }
 
       const selectedGrade = grades.find(g => g.id === newCourseData.gradeId);
@@ -465,6 +471,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       console.error(err);
     } finally {
       setIsLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -495,7 +502,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
       let finalImg = teacher.imageUrl;
       if (editTeacherImage) {
-        finalImg = await dbService.uploadFile(editTeacherImage, 'teachers');
+        finalImg = await dbService.uploadFile(editTeacherImage, 'teachers', (progress) => setUploadProgress(progress));
       }
       const updatedTeacher = { ...teacher, imageUrl: finalImg };
       setTeachers(prev => prev.map(t => t.id === updatedTeacher.id ? updatedTeacher : t));
@@ -507,6 +514,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       alert("خطأ أثناء تحديث بيانات المدرس");
     } finally {
       setIsLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -514,7 +522,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!editingCourse) return;
     setIsLoading(true);
     try {
-      const url = await dbService.uploadFile(file, `courses/media/${editingCourse.id}`);
+      const url = await dbService.uploadFile(file, `courses/media/${editingCourse.id}`, (progress) => setUploadProgress(progress));
       const newMedia: CourseMedia = {
         id: `m-${Date.now()}`,
         title: file.name,
@@ -528,6 +536,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       alert("خطأ أثناء رفع الملف");
     } finally {
       setIsLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -623,6 +632,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-10" dir="rtl">
+      {/* Upload Progress Overlay */}
+      {(uploadProgress > 0) && (
+        <div className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-300">
+          <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl text-center max-w-sm w-full mx-4 border border-gray-100 transform scale-100 hover:scale-105 transition-transform">
+            <div className="mb-6 text-7xl animate-bounce filter drop-shadow-lg">🚀</div>
+            <h3 className="text-3xl font-black text-[#0a192f] mb-2">جاري الرفع...</h3>
+            <p className="text-gray-400 font-bold text-sm mb-6">يرجى الانتظار قليلاً</p>
+
+            <div className="relative w-full bg-gray-100 rounded-full h-6 mb-4 overflow-hidden inner-shadow">
+              <div
+                className="bg-gradient-to-r from-[#10b981] to-[#34d399] h-full transition-all duration-300 ease-out shadow-[0_0_15px_rgba(16,185,129,0.5)]"
+                style={{ width: `${uploadProgress}%` }}
+              >
+                <div className="absolute top-0 right-0 bottom-0 left-0 bg-white/20 animate-[shimmer_1s_infinite] skew-x-12"></div>
+              </div>
+            </div>
+            <p className="text-[#10b981] font-black text-2xl">{Math.round(uploadProgress)}%</p>
+          </div>
+        </div>
+      )}
+
       {/* API Key Banner Removed */}
 
       <VoiceAssistant
