@@ -12,7 +12,27 @@ interface GradeDetailProps {
 }
 
 export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, courses, onBack }) => {
+  const formatTimeForDisplay = (timeStr: string) => {
+    if (!timeStr) return '';
+
+    // Check if it's already 12h (contains AM/PM or Arabic suffix)
+    if (timeStr.match(/AM|PM|ص|م/)) return timeStr;
+
+    // Try parsing "HH:mm"
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+    if (match) {
+      let h = parseInt(match[1]);
+      const m = match[2];
+      const period = h >= 12 ? 'م' : 'ص';
+      h = h % 12 || 12;
+      return `${h}:${m} ${period}`;
+    }
+
+    return timeStr; // Fallback
+  };
+
   const [activeTab, setActiveTab] = useState<'schedule' | 'teachers' | 'courses'>('schedule');
+
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<CourseMedia | null>(null);
   const [bookingTarget, setBookingTarget] = useState<{ name: string, type: 'مدرس' | 'كورس' | 'حصة' } | null>(null);
@@ -157,7 +177,8 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
                               </div>
                               <div>
                                 <div className="font-black text-2xl text-gray-900 leading-tight">{slot.subject}</div>
-                                <div className="text-sm font-bold opacity-70 mt-1">{slot.time}</div>
+                                <div className="text-sm font-bold opacity-70 mt-1">{formatTimeForDisplay(slot.time)}</div>
+
                               </div>
                             </div>
                           );
