@@ -20,10 +20,12 @@ interface AdminDashboardProps {
   onLogout: () => void;
   apiKey: string;
   setApiKey: React.Dispatch<React.SetStateAction<string>>;
+  anthropicApiKey: string;
+  setAnthropicApiKey: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
-  grades, setGrades, teachers, setTeachers, courses, setCourses, onLogout, apiKey, setApiKey
+  grades, setGrades, teachers, setTeachers, courses, setCourses, onLogout, apiKey, setApiKey, anthropicApiKey, setAnthropicApiKey
 }) => {
   const [activeTab, setActiveTab] = useState<'ai-schedule' | 'teachers' | 'subjects' | 'courses' | 'settings'>('ai-schedule');
   const [managementSubTab, setManagementSubTab] = useState<'list' | 'add' | 'ai-add'>('list');
@@ -41,6 +43,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const [aiInput, setAiInput] = useState('');
   const [scheduleAiInput, setScheduleAiInput] = useState(''); // for AI Schedule Tab
+  const [selectedProvider, setSelectedProvider] = useState<'gemini' | 'claude'>('gemini'); // AI Provider State
   const [scheduleSubTab, setScheduleSubTab] = useState<'ai' | 'manual' | 'ramadan'>('ai');
   const [manualScheduleGradeId, setManualScheduleGradeId] = useState('');
   const [manualScheduleData, setManualScheduleData] = useState<DaySchedule[]>([]);
@@ -460,7 +463,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const context = selectedGrade ? `[الصف: ${selectedGrade.name}]` : '';
 
       // Get structured nested schedule from AI service
-      const aiGeneratedSchedule = await parseScheduleWithAI(`${context} ${scheduleAiInput}`, apiKey);
+      const effectiveKey = selectedProvider === 'gemini' ? apiKey : anthropicApiKey;
+      const aiGeneratedSchedule = await parseScheduleWithAI(`${context} ${scheduleAiInput}`, effectiveKey, selectedProvider);
 
       // 3. Smart Merge & Deduplicate
       setGrades(prev => prev.map(grade => {
@@ -582,19 +586,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               {/* Artificial Model Selector */}
               <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
                 {[
-                  { id: 'gemini', name: 'Gemini 1.5 Pro', icon: '💎', premium: true },
-                  { id: 'claude', name: 'Claude 3.5 Sonnet', icon: '⚡', premium: true },
-                  { id: 'offline', name: 'Local Intelligence', icon: '🧠', premium: false },
+                  { id: 'gemini', name: 'Gemini 1.5 Pro', icon: '💎', premium: true, provider: 'gemini' },
+                  { id: 'claude', name: 'Claude 3.5 Sonnet', icon: '⚡', premium: true, provider: 'claude' },
+                  { id: 'offline', name: 'Local Intelligence', icon: '🧠', premium: false, provider: 'offline' },
                 ].map(model => (
                   <button
                     key={model.id}
                     onClick={() => {
-                      if (model.premium && !apiKey) {
-                        console.log("Using Local Intelligence (No API Key detected)");
+                      if (model.id !== 'offline') {
+                        setSelectedProvider(model.provider as 'gemini' | 'claude');
+                      }
+                      if (model.premium && !apiKey && model.id === 'gemini') {
+                        console.log("Using Local Intelligence (No Gemini Key detected)");
                       }
                     }}
-                    className={`flex items-center gap-3 px-6 py-4 rounded-2xl border-2 transition-all min-w-[200px] ${(!apiKey && model.premium) ? 'opacity-50 grayscale cursor-not-allowed' :
-                      'border-[#0a192f] bg-[#0a192f] text-white shadow-lg scale-105'
+                    className={`flex items-center gap-3 px-6 py-4 rounded-2xl border-2 transition-all min-w-[200px] ${(model.id === 'gemini' && !apiKey) || (model.id === 'claude' && !anthropicApiKey) ? 'opacity-50 grayscale cursor-not-allowed' :
+                        (selectedProvider === model.provider && model.id !== 'offline') ? 'border-[#10b981] bg-[#0a192f] text-white shadow-lg scale-105' :
+                          'border-[#0a192f] bg-white text-[#0a192f] hover:bg-gray-50'
                       }`}
                   >
                     <span className="text-2xl">{model.icon}</span>
@@ -1653,6 +1661,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <br />
                       * يستخدم لتوليد الجداول، إضافة المدرسين، وتحسين النصوص.
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Anthropic API Key Settings Section */}
+              <div className="mt-8 border-t pt-8">
+                <div className="flex items-center gap-4 mb-6">
+                  <span className="text-4xl">⚡</span>
+                  <div>
+                    <h2 className="text-2xl font-black text-[#0a192f]">Claude API Key</h2>
+                    <p className="text-gray-400 font-bold text-sm">إعدادات Anthropic Claude 3.5 Sonnet</p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-black text-gray-500 mb-2">Anthropic API Key (sk-ant...):</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={anthropicApiKey}
+                        onChange={(e) => {
+                          setAnthropicApiKey(e.target.value);
+                          localStorage.setItem('anthropic_api_key', e.target.value);
+                        }}
+                        placeholder="sk-ant-api..."
+                        className="flex-1 border-2 border-gray-200 rounded-xl p-4 font-bold text-left outline-none focus:border-[#f97316] transition-colors"
+                        dir="ltr"
+                      />
+                      {anthropicApiKey && (
+                        <button
+                          onClick={() => {
+                            setAnthropicApiKey('');
+                            localStorage.removeItem('anthropic_api_key');
+                          }}
+                          className="bg-red-50 text-red-500 px-4 rounded-xl font-bold hover:bg-red-100 transition-all"
+                        >
+                          حذف
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

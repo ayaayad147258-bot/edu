@@ -175,14 +175,43 @@ export const parseScheduleRegex = (text: string): DaySchedule[] => {
   return schedule;
 };
 
-export const parseScheduleWithAI = async (textInput: string, apiKey?: string): Promise<DaySchedule[]> => {
+const callClaudeAPI = async (prompt: string, apiKey: string): Promise<string> => {
+  try {
+    const response = await fetch('/api/anthropic/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: "claude-3-5-sonnet-20240620",
+        max_tokens: 4096,
+        messages: [{ role: "user", content: prompt }]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`Claude API Error: ${err}`);
+    }
+
+    const data = await response.json();
+    return data.content[0].text;
+  } catch (error) {
+    console.error("Claude API Request Failed:", error);
+    throw error;
+  }
+};
+
+export const parseScheduleWithAI = async (textInput: string, apiKey?: string, provider: 'gemini' | 'claude' = 'gemini'): Promise<DaySchedule[]> => {
   try {
     const key = apiKey || import.meta.env.VITE_GEMINI_API_KEY;
     if (!key) {
       console.warn("API Key missing, using Smart Context Regex parser.");
       return parseScheduleRegex(textInput);
     }
-    const ai = new GoogleGenAI({ apiKey: key });
+    // const ai = new GoogleGenAI({ apiKey: key }); // Moved inside Gemini block
 
     // Subject Configuration (Reused for AI styling)
     const subjectConfig: { [key: string]: { name: string, color: string, icon: string, keywords: string[] } } = {
@@ -215,15 +244,24 @@ export const parseScheduleWithAI = async (textInput: string, apiKey?: string): P
       "${textInput}"
     `;
 
-    const result = await ai.models.generateContent({
-      model: model,
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: {
-        responseMimeType: "application/json"
-      }
-    });
+    let responseText = '';
 
-    const responseText = result.text;
+    if (provider === 'claude') {
+      responseText = await callClaudeAPI(prompt, key);
+    } else {
+      // Gemini Default
+      const ai = new GoogleGenAI({ apiKey: key });
+      const result = await ai.models.generateContent({
+        model: model,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          responseMimeType: "application/json"
+        }
+      });
+      responseText = result.text || '';
+    }
+
+    // const responseText = result.text; // Removed
     if (!responseText) throw new Error("Empty response from AI");
     const rawData = JSON.parse(responseText) as { day: string, subject: string, time: string }[];
 
@@ -318,7 +356,7 @@ export const parseTeachersRegex = (text: string): Partial<Teacher>[] => {
   return teachers;
 };
 
-export const parseTeachersWithAI = async (textInput: string, apiKey?: string): Promise<Partial<Teacher>[]> => {
+export const parseTeachersWithAI = async (textInput: string, apiKey?: string, provider: 'gemini' | 'claude' = 'gemini'): Promise<Partial<Teacher>[]> => {
   try {
     const key = apiKey || import.meta.env.VITE_GEMINI_API_KEY;
     if (!key) {
@@ -326,10 +364,8 @@ export const parseTeachersWithAI = async (textInput: string, apiKey?: string): P
       return parseTeachersRegex(textInput);
     }
     // ... existing AI logic ...
-    const ai = new GoogleGenAI({ apiKey: key });
-    const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
-      contents: `قم بتحليل النص التالي لاستخراج بيانات المدرسين وتحويلها إلى JSON.
+
+    const prompt = `قم بتحليل النص التالي لاستخراج بيانات المدرسين وتحويلها إلى JSON.
       المدخلات: "${textInput}"
       
       المخرجات المطلوبة (باللغة العربية):
@@ -340,30 +376,43 @@ export const parseTeachersWithAI = async (textInput: string, apiKey?: string): P
       - teachingHours: ساعات العمل (عربي).
       - grades: قائمة الصفوف (عربي).
       - imageUrl: رابط صورة عشوائي.
-      - id: معرف عشوائي.`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              name: { type: Type.STRING },
-              subject: { type: Type.STRING },
-              bio: { type: Type.STRING },
-              availability: { type: Type.STRING },
-              teachingHours: { type: Type.STRING },
-              grades: { type: Type.ARRAY, items: { type: Type.STRING } },
-              imageUrl: { type: Type.STRING }
-            },
-            required: ['id', 'name', 'subject', 'bio', 'availability', 'teachingHours', 'grades', 'imageUrl']
+      - id: معرف عشوائي.
+      
+      Output ONLY JSON array.`;
+
+    let responseText = '';
+    if (provider === 'claude') {
+      responseText = await callClaudeAPI(prompt, key);
+    } else {
+      const ai = new GoogleGenAI({ apiKey: key });
+      const response = await ai.models.generateContent({
+        model: 'gemini-1.5-flash',
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                name: { type: Type.STRING },
+                subject: { type: Type.STRING },
+                bio: { type: Type.STRING },
+                availability: { type: Type.STRING },
+                teachingHours: { type: Type.STRING },
+                grades: { type: Type.ARRAY, items: { type: Type.STRING } },
+                imageUrl: { type: Type.STRING }
+              },
+              required: ['id', 'name', 'subject', 'bio', 'availability', 'teachingHours', 'grades', 'imageUrl']
+            }
           }
         }
-      }
-    });
+      });
+      responseText = response.text || '[]';
+    }
 
-    return JSON.parse(response.text.trim());
+    return JSON.parse(responseText.trim());
   } catch (error) {
     console.error("AI Teacher Parsing Error:", error);
     return parseTeachersRegex(textInput);
