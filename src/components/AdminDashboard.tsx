@@ -10,6 +10,101 @@ import logo from '../assets/logo.png';
 
 
 
+const TimePicker = ({ value, onChange }: { value: string, onChange: (val: string) => void }) => {
+  // Parse initial value
+  const parseTime = (timeStr: string) => {
+    let hour = '12';
+    let minute = '00';
+    let period = 'AM'; // 'AM' -> 'ص', 'PM' -> 'م' in UI
+
+    if (!timeStr) return { hour, minute, period };
+
+    // Try parsing "HH:mm" (24h)
+    const match24 = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+    if (match24) {
+      let h = parseInt(match24[1]);
+      const m = match24[2];
+      period = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      hour = h.toString();
+      minute = m;
+      return { hour, minute, period };
+    }
+
+    // Try parsing "h:mm A" (Arabic/English)
+    const match12 = timeStr.match(/^(\d{1,2}):(\d{2})\s*(.*)$/);
+    if (match12) {
+      hour = match12[1];
+      minute = match12[2];
+      const p = match12[3].trim();
+      period = (p === 'م' || p === 'PM' || p === 'مساءً') ? 'PM' : 'AM';
+      return { hour, minute, period };
+    }
+
+    return { hour, minute, period };
+  };
+
+  const { hour: initHour, minute: initMinute, period: initPeriod } = parseTime(value);
+  const [hour, setHour] = useState(initHour);
+  const [minute, setMinute] = useState(initMinute);
+  const [period, setPeriod] = useState(initPeriod);
+
+  // Sync internal state if value prop changes externally (optional but good)
+  useEffect(() => {
+    const { hour, minute, period } = parseTime(value);
+    setHour(hour);
+    setMinute(minute);
+    setPeriod(period);
+  }, [value]);
+
+  const updateTime = (h: string, m: string, p: string) => {
+    setHour(h);
+    setMinute(m);
+    setPeriod(p);
+    const suffix = p === 'AM' ? 'ص' : 'م';
+    onChange(`${h}:${m} ${suffix}`); // "09:30 ص"
+  };
+
+  return (
+    <div className="flex items-center gap-1" dir="ltr">
+
+      {/* Period */}
+      <select
+        value={period}
+        onChange={(e) => updateTime(hour, minute, e.target.value)}
+        className="bg-gray-50 border border-gray-200 rounded-lg p-1 text-sm font-bold outline-none focus:border-[#0a192f] w-16 text-center"
+      >
+        <option value="AM">صباحاً</option>
+        <option value="PM">مساءً</option>
+      </select>
+
+      {/* Minute */}
+      <select
+        value={minute}
+        onChange={(e) => updateTime(hour, e.target.value, period)}
+        className="bg-gray-50 border border-gray-200 rounded-lg p-1 text-sm font-bold outline-none focus:border-[#0a192f] w-14 text-center"
+      >
+        {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map(m => (
+          <option key={m} value={m}>{m}</option>
+        ))}
+      </select>
+
+      <span className="font-bold">:</span>
+
+      {/* Hour */}
+      <select
+        value={hour}
+        onChange={(e) => updateTime(e.target.value, minute, period)}
+        className="bg-gray-50 border border-gray-200 rounded-lg p-1 text-sm font-bold outline-none focus:border-[#0a192f] w-14 text-center"
+      >
+        {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+          <option key={h} value={h}>{h}</option>
+        ))}
+      </select>
+    </div>
+  );
+};
+
 interface AdminDashboardProps {
   grades: GradeData[];
   setGrades: React.Dispatch<React.SetStateAction<GradeData[]>>;
@@ -754,16 +849,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     {allSubjects.map(sub => <option key={sub} value={sub}>{sub}</option>)}
                                   </select>
 
-                                  <input
-                                    type="time"
+                                  <TimePicker
                                     value={slot.time}
-                                    onChange={(e) => {
+                                    onChange={(newTime) => {
                                       const updatedSchedule = [...manualScheduleData];
                                       const dIdx = updatedSchedule.findIndex(d => d.day === day);
-                                      updatedSchedule[dIdx].slots[sIdx].time = e.target.value;
+                                      updatedSchedule[dIdx].slots[sIdx].time = newTime;
                                       setManualScheduleData(updatedSchedule);
                                     }}
-                                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm font-bold outline-none focus:border-[#0a192f] text-left"
                                   />
                                 </div>
 
@@ -888,17 +981,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     </select>
                                   </div>
                                   <div className="w-32">
-                                    <input
-                                      type="text"
+                                    <TimePicker
                                       value={slot.time}
-                                      onChange={(e) => {
+                                      onChange={(newTime) => {
                                         const updatedData = [...ramadanScheduleData];
                                         const dIdx = updatedData.findIndex(d => d.day === dayName);
-                                        updatedData[dIdx].slots[slotIndex].time = e.target.value;
+                                        updatedData[dIdx].slots[slotIndex].time = newTime;
                                         setRamadanScheduleData(updatedData);
                                       }}
-                                      className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold text-center focus:border-[#f97316] outline-none"
-                                      placeholder="00:00"
                                     />
                                   </div>
                                   <button
