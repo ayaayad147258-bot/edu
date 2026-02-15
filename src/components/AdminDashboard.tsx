@@ -802,68 +802,191 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="bg-gray-50 rounded-[2.5rem] p-6 border border-gray-200">
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="text-xl font-black text-[#0a192f]">جدول رمضان 🌙</h3>
+                    <div className="flex gap-2 bg-orange-100 p-1 rounded-xl">
+                      <button
+                        onClick={() => setRamadanTextInput('')}
+                        className={`px-4 py-2 rounded-lg font-bold transition-all ${ramadanTextInput === '' ? 'bg-[#f97316] text-white shadow' : 'text-gray-500'}`}
+                      >
+                        ✍️ تعديل يدوي
+                      </button>
+                      <button
+                        onClick={() => {/* AI mode - just show the textarea */}}
+                        className={`px-4 py-2 rounded-lg font-bold transition-all ${ramadanTextInput !== '' ? 'bg-[#f97316] text-white shadow' : 'text-gray-500'}`}
+                      >
+                        🤖 نص ذكي
+                      </button>
+                    </div>
                   </div>
 
-                  <textarea
-                    value={ramadanTextInput}
-                    onChange={(e) => setRamadanTextInput(e.target.value)}
-                    className="w-full border-2 rounded-[2rem] p-8 h-64 outline-none font-bold text-xl leading-relaxed shadow-inner bg-white focus:border-[#f97316] transition-all mb-6"
-                    placeholder="اكتب جدول رمضان هنا كما تحب.. مثال: السبت 2 م لغة عربية، الأحد 4 م رياضيات..."
-                  />
+                  {/* AI Text Input Mode */}
+                  {ramadanTextInput !== '' ? (
+                    <div>
+                      <textarea
+                        value={ramadanTextInput}
+                        onChange={(e) => setRamadanTextInput(e.target.value)}
+                        className="w-full border-2 rounded-[2rem] p-8 h-64 outline-none font-bold text-xl leading-relaxed shadow-inner bg-white focus:border-[#f97316] transition-all mb-6"
+                        placeholder="اكتب جدول رمضان هنا كما تحب.. مثال: السبت 2 م لغة عربية، الأحد 4 م رياضيات..."
+                      />
 
-                  <div className="flex gap-4">
-                    <button
-                      onClick={async () => {
-                        if (!ramadanTextInput.trim()) return alert("يرجى كتابة الجدول أولاً");
-                        setIsLoading(true);
-                        try {
-                          const parsedSchedule = await parseScheduleWithAI(ramadanTextInput, apiKey);
-
-                          setGrades(prev => prev.map(g => g.id === ramadanScheduleGradeId ? {
-                            ...g,
-                            ramadanSchedule: parsedSchedule,
-                            isRamadanActive: isRamadanActive
-                          } : g));
-
-                          // Also update local view
-                          setRamadanScheduleData(parsedSchedule);
-
-                          alert("تم تحديث جدول رمضان بنجاح! 🌙✅");
-                          setRamadanTextInput('');
-                        } catch (error) {
-                          console.error(error);
-                          alert("حدث خطأ أثناء المعالجة.");
-                        } finally {
-                          setIsLoading(false);
-                        }
-                      }}
-                      disabled={isLoading}
-                      className="flex-1 bg-[#f97316] text-white py-4 rounded-xl font-black text-xl hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {isLoading ? 'جاري المعالجة...' : 'تحديث جدول رمضان 🌙'}
-                    </button>
-
-                    <div className="flex items-center gap-2 bg-orange-100 px-4 rounded-xl border-2 border-orange-200 cursor-pointer" onClick={() => setIsRamadanActive(!isRamadanActive)}>
-                      <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${isRamadanActive ? 'bg-[#f97316] border-[#f97316]' : 'border-gray-300 bg-white'}`}>
-                        {isRamadanActive && <span className="text-white text-sm font-bold">✓</span>}
+                      <div className="flex gap-4">
+                        <button
+                          onClick={async () => {
+                            if (!ramadanTextInput.trim()) return alert("يرجى كتابة الجدول أولاً");
+                            setIsLoading(true);
+                            try {
+                              const parsedSchedule = await parseScheduleWithAI(ramadanTextInput, apiKey);
+                              
+                              setGrades(prev => prev.map(g => g.id === ramadanScheduleGradeId ? { 
+                                  ...g, 
+                                  ramadanSchedule: parsedSchedule,
+                                  isRamadanActive: isRamadanActive 
+                              } : g));
+                              
+                              setRamadanScheduleData(parsedSchedule);
+                              alert("تم تحديث جدول رمضان بنجاح! 🌙✅");
+                              setRamadanTextInput('');
+                            } catch (error) {
+                              console.error(error);
+                              alert("حدث خطأ أثناء المعالجة.");
+                            } finally {
+                              setIsLoading(false);
+                            }
+                          }}
+                          disabled={isLoading}
+                          className="flex-1 bg-[#f97316] text-white py-4 rounded-xl font-black text-xl hover:bg-orange-600 transition-all shadow-lg shadow-orange-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isLoading ? 'جاري المعالجة...' : 'تحديث بالذكاء 🤖'}
+                        </button>
                       </div>
-                      <span className="font-bold text-orange-900 select-none">تفعيل إجباري للطلاب</span>
+                    </div>
+                  ) : (
+                    /* Manual Grid Editor Mode */
+                    <div>
+                      <div className="flex justify-between items-center mb-6">
+                        <p className="text-gray-500 font-bold">✍️ التعديل اليدوي - أضف حصص الجدول يدوياً</p>
+                        <button
+                          onClick={() => {
+                            setGrades(prev => prev.map(g => g.id === ramadanScheduleGradeId ? { ...g, ramadanSchedule: ramadanScheduleData, isRamadanActive } : g));
+                            alert("تم حفظ جدول رمضان! 🌙✅");
+                          }}
+                          className="bg-[#f97316] text-white px-8 py-3 rounded-xl font-black shadow-lg hover:bg-orange-600 transition-all active:scale-95 flex items-center gap-2"
+                        >
+                          <span>💾</span> حفظ التغييرات
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'].map(day => {
+                          const dayData = ramadanScheduleData.find(d => d.day === day) || { day, slots: [] };
+
+                          return (
+                            <div key={day} className="bg-white p-5 rounded-3xl shadow-sm border border-gray-100 hover:border-[#f97316]/20 transition-all">
+                              <div className="flex justify-between items-center mb-4 border-b pb-2">
+                                <h4 className="font-black text-lg text-[#0a192f]">{day}</h4>
+                                <button
+                                  onClick={() => {
+                                    const newSlot: ScheduleSlot = {
+                                      id: `s-${Date.now()}-${Math.random()}`,
+                                      subject: '',
+                                      time: '',
+                                      color: 'bg-orange-500',
+                                      teacherId: ''
+                                    };
+                                    const updatedSchedule = [...ramadanScheduleData];
+                                    const existingDayIndex = updatedSchedule.findIndex(d => d.day === day);
+                                    if (existingDayIndex >= 0) {
+                                      updatedSchedule[existingDayIndex].slots.push(newSlot);
+                                    } else {
+                                      updatedSchedule.push({ day, slots: [newSlot] });
+                                    }
+                                    setRamadanScheduleData(updatedSchedule);
+                                  }}
+                                  className="w-8 h-8 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center font-black hover:bg-orange-100 transition-all"
+                                  title="إضافة حصة"
+                                >
+                                  +
+                                </button>
+                              </div>
+
+                              <div className="space-y-3">
+                                {dayData.slots.map((slot, sIdx) => (
+                                  <div key={slot.id} className="bg-gray-50 p-3 rounded-2xl border border-gray-200 group relative">
+                                    <div className="space-y-2">
+                                      <select
+                                        value={slot.subject}
+                                        onChange={(e) => {
+                                          const updatedSchedule = [...ramadanScheduleData];
+                                          const dIdx = updatedSchedule.findIndex(d => d.day === day);
+                                          updatedSchedule[dIdx].slots[sIdx].subject = e.target.value;
+                                          setRamadanScheduleData(updatedSchedule);
+                                        }}
+                                        className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm font-bold outline-none focus:border-[#f97316]"
+                                      >
+                                        <option value="">اختيار المادة...</option>
+                                        {allSubjects.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                                      </select>
+
+                                      <input
+                                        type="time"
+                                        value={slot.time}
+                                        onChange={(e) => {
+                                          const updatedSchedule = [...ramadanScheduleData];
+                                          const dIdx = updatedSchedule.findIndex(d => d.day === day);
+                                          updatedSchedule[dIdx].slots[sIdx].time = e.target.value;
+                                          setRamadanScheduleData(updatedSchedule);
+                                        }}
+                                        className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm font-bold outline-none focus:border-[#f97316] text-left"
+                                      />
+                                    </div>
+
+                                    <button
+                                      onClick={() => {
+                                        const updatedSchedule = [...ramadanScheduleData];
+                                        const dIdx = updatedSchedule.findIndex(d => d.day === day);
+                                        updatedSchedule[dIdx].slots = updatedSchedule[dIdx].slots.filter(s => s.id !== slot.id);
+                                        setRamadanScheduleData(updatedSchedule);
+                                      }}
+                                      className="absolute -top-2 -left-2 w-6 h-6 bg-red-100 text-red-500 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-all font-black shadow-sm hover:bg-red-500 hover:text-white"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                                {dayData.slots.length === 0 && (
+                                  <p className="text-center text-gray-300 text-xs font-bold py-4">لا توجد حصص</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Common Controls */}
+                  <div className="mt-6 flex gap-4 items-center justify-between">
+                    <div className="flex items-center gap-2 bg-orange-100 px-4 py-3 rounded-xl border-2 border-orange-200 cursor-pointer" onClick={() => setIsRamadanActive(!isRamadanActive)}>
+                        <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${isRamadanActive ? 'bg-[#f97316] border-[#f97316]' : 'border-gray-300 bg-white'}`}>
+                            {isRamadanActive && <span className="text-white text-sm font-bold">✓</span>}
+                        </div>
+                        <span className="font-bold text-orange-900 select-none">تفعيل إجباري للطلاب</span>
                     </div>
 
                     <button
                       onClick={() => {
-                        if (confirm("هل أنت متأكد من حذف جدول رمضان لهذا الصف؟ سيعود الجدول لطبيعته.")) {
-                          setGrades(prev => prev.map(g => g.id === ramadanScheduleGradeId ? { ...g, ramadanSchedule: [], isRamadanActive: false } : g));
-                          setRamadanScheduleData([]);
-                          setIsRamadanActive(false);
-                          alert("تم حذف الجدول.");
-                        }
+                          if (confirm("هل أنت متأكد من حذف جدول رمضان لهذا الصف؟ سيعود الجدول لطبيعته.")) {
+                              setGrades(prev => prev.map(g => g.id === ramadanScheduleGradeId ? { ...g, ramadanSchedule: [], isRamadanActive: false } : g));
+                              setRamadanScheduleData([]);
+                              setIsRamadanActive(false);
+                              alert("تم حذف الجدول.");
+                          }
                       }}
-                      className="bg-red-50 text-red-500 px-8 rounded-xl font-black hover:bg-red-100 transition-all"
+                      className="bg-red-50 text-red-500 px-8 py-3 rounded-xl font-black hover:bg-red-100 transition-all"
                     >
                       حذف الجدول 🗑️
                     </button>
                   </div>
+
                   <div className="mt-8">
                     <h4 className="text-lg font-black text-[#0a192f] mb-4">الجدول الحالي لرمضان:</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
