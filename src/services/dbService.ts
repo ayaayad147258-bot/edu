@@ -2,7 +2,7 @@
 import { GradeData, Teacher, Course } from '../types';
 
 import { db, storage } from './firebase';
-import { collection, doc, getDocs, writeBatch, setDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, writeBatch, setDoc, deleteDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 /**
@@ -157,6 +157,26 @@ export const dbService = {
       } catch (err) {
         console.error("Firebase Save Courses Error:", err);
       }
+    }
+  },
+
+  async deleteTeacher(id: string) {
+    if (!db) return;
+    try {
+      await deleteDoc(doc(db, 'teachers', id));
+    } catch (err) {
+      console.error("Firebase Delete Teacher Error:", err);
+      throw err;
+    }
+  },
+
+  async deleteCourse(id: string) {
+    if (!db) return;
+    try {
+      await deleteDoc(doc(db, 'courses', id));
+    } catch (err) {
+      console.error("Firebase Delete Course Error:", err);
+      throw err;
     }
   },
 

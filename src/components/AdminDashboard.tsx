@@ -1520,7 +1520,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <button
                           onClick={() => {
                             if (confirm("حذف هذا العنصر؟")) {
-                              setEditingCourse({ ...editingCourse, media: editingCourse.media.filter(m => m.id !== item.id) });
+                              const newMedia = editingCourse.media.filter(m => m.id !== item.id);
+                              setEditingCourse({ ...editingCourse, media: newMedia });
+                              // Note: We might want to implement deleteMedia in dbService too for complete cleanup
                             }
                           }}
                           className="w-10 h-10 bg-red-50 text-red-500 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all self-center"
@@ -1624,16 +1626,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <p className="text-red-600 font-black text-sm">سيتم حذف جميع الكورسات والمواعيد المرتبطة بهذا المدرس أيضاً.</p>
               </div>
               <div className="flex flex-col gap-3">
-                <button onClick={() => {
-                  const idToRemove = teacherToDelete.id;
-                  setTeachers(prev => prev.filter(t => t.id !== idToRemove));
-                  setCourses(prev => prev.filter(c => c.teacherId !== idToRemove));
-                  setGrades(prev => prev.map(grade => ({
-                    ...grade,
-                    teachers: grade.teachers.filter(tid => tid !== idToRemove)
-                  })));
-                  setTeacherToDelete(null);
-                  alert(`تم حذف المدرس "${teacherToDelete.name}" بنجاح.`);
+                <button onClick={async () => {
+                  try {
+                    await dbService.deleteTeacher(teacherToDelete.id);
+                    const idToRemove = teacherToDelete.id;
+                    setTeachers(prev => prev.filter(t => t.id !== idToRemove));
+                    setCourses(prev => prev.filter(c => c.teacherId !== idToRemove));
+                    setGrades(prev => prev.map(grade => ({
+                      ...grade,
+                      teachers: grade.teachers.filter(tid => tid !== idToRemove)
+                    })));
+                    setTeacherToDelete(null);
+                    alert(`تم حذف المدرس "${teacherToDelete.name}" بنجاح.`);
+                  } catch (err) {
+                    console.error(err);
+                    alert("حدث خطأ أثناء حذف المدرس من قاعدة البيانات.");
+                  }
                 }} className="w-full bg-red-500 text-white py-5 rounded-2xl font-black text-xl hover:bg-red-600 transition-all active:scale-95 shadow-xl shadow-red-500/20">
                   تأكيد الحذف النهائي 🗑️
                 </button>
