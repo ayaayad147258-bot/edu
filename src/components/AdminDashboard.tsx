@@ -216,12 +216,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const allSubjects = Array.from(new Set(stageSubjects.flatMap(s => s.subjects))).sort();
 
-  // useEffect for checking window.aistudio removed as it's handled in App.tsx
+  // Auto-save when data changes (but NOT when arrays are empty during initial load)
   useEffect(() => {
-    dbService.saveGrades(grades);
-    dbService.saveTeachers(teachers);
-    dbService.saveCourses(courses);
-    localStorage.setItem('academy_stage_subjects', JSON.stringify(stageSubjects));
+    // Only save if at least one array has data (prevents saving empty state on initial load)
+    if (grades.length > 0 || teachers.length > 0 || courses.length > 0) {
+      console.log('💾 Auto-saving data to Firebase...');
+      dbService.saveGrades(grades);
+      dbService.saveTeachers(teachers);
+      dbService.saveCourses(courses);
+      localStorage.setItem('academy_stage_subjects', JSON.stringify(stageSubjects));
+    } else {
+      console.log('⏸️ Skipping auto-save: data not loaded yet');
+    }
   }, [grades, teachers, courses, stageSubjects]);
 
   useEffect(() => {

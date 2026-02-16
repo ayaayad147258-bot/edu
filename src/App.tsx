@@ -30,19 +30,37 @@ const App: React.FC = () => {
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [selectedGrade, setSelectedGrade] = useState<GradeData | null>(null);
 
-  const [grades, setGrades] = useState<GradeData[]>(INITIAL_GRADES);
-  const [teachers, setTeachers] = useState<Teacher[]>(INITIAL_TEACHERS);
-  const [courses, setCourses] = useState<Course[]>(INITIAL_COURSES);
+  // CRITICAL FIX: Start with EMPTY arrays to prevent auto-save of INITIAL data on every refresh
+  const [grades, setGrades] = useState<GradeData[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        console.log('📥 Loading data from Firebase/cache...');
         const data = await dbService.loadData();
-        if (data.grades) setGrades(data.grades.filter(g => g && g.id));
-        if (data.teachers) setTeachers(data.teachers.filter(t => t && t.id));
-        if (data.courses) setCourses(data.courses.filter(c => c && c.id));
+
+        // If Firebase/cache is empty, use INITIAL data (first-time setup only)
+        const loadedGrades = (data.grades && data.grades.length > 0) ? data.grades : INITIAL_GRADES;
+        const loadedTeachers = (data.teachers && data.teachers.length > 0) ? data.teachers : INITIAL_TEACHERS;
+        const loadedCourses = (data.courses && data.courses.length > 0) ? data.courses : INITIAL_COURSES;
+
+        setGrades(loadedGrades.filter(g => g && g.id));
+        setTeachers(loadedTeachers.filter(t => t && t.id));
+        setCourses(loadedCourses.filter(c => c && c.id));
+
+        console.log('✅ Data loaded:', {
+          grades: loadedGrades.length,
+          teachers: loadedTeachers.length,
+          courses: loadedCourses.length
+        });
       } catch (err) {
         console.error("Critical: Failed to load data", err);
+        // On error, use INITIAL data as fallback
+        setGrades(INITIAL_GRADES);
+        setTeachers(INITIAL_TEACHERS);
+        setCourses(INITIAL_COURSES);
       }
 
       // Check for API Key (Project IDX / AI Studio)
