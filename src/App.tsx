@@ -12,19 +12,20 @@ import logo from './assets/logo.png';
 
 import { parseScheduleWithAI, parseTeachersWithAI } from './services/geminiService';
 import { VoiceAssistant } from './components/VoiceAssistant';
+import { safeStorage } from './utils/storage';
 
 const App: React.FC = () => {
   const [view, setView] = useState<'home' | 'stages' | 'grade' | 'admin' | 'teachers'>(() => {
-    const saved = localStorage.getItem('app_view');
+    const saved = safeStorage.getItem('app_view');
     const validViews = ['home', 'stages', 'grade', 'admin', 'teachers'];
     return (saved && validViews.includes(saved)) ? (saved as any) : 'home';
   });
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
-    return sessionStorage.getItem('admin_auth') === 'true';
+    return safeStorage.getSession('admin_auth') === 'true';
   });
   const [adminPassword, setAdminPassword] = useState('');
-  const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
-  const [anthropicApiKey, setAnthropicApiKey] = useState(localStorage.getItem('anthropic_api_key') || '');
+  const [apiKey, setApiKey] = useState(safeStorage.getItem('gemini_api_key') || '');
+  const [anthropicApiKey, setAnthropicApiKey] = useState(safeStorage.getItem('anthropic_api_key') || '');
 
   const [selectedStage, setSelectedStage] = useState<Stage | null>(null);
   const [selectedGrade, setSelectedGrade] = useState<GradeData | null>(null);
@@ -35,32 +36,35 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const data = await dbService.loadData();
-      if (data.grades) setGrades(data.grades.filter(g => g && g.id));
-      if (data.teachers) setTeachers(data.teachers.filter(t => t && t.id));
-      if (data.courses) setCourses(data.courses.filter(c => c && c.id));
+      try {
+        const data = await dbService.loadData();
+        if (data.grades) setGrades(data.grades.filter(g => g && g.id));
+        if (data.teachers) setTeachers(data.teachers.filter(t => t && t.id));
+        if (data.courses) setCourses(data.courses.filter(c => c && c.id));
+      } catch (err) {
+        console.error("Critical: Failed to load data", err);
+      }
 
       // Check for API Key (Project IDX / AI Studio)
       if (window.aistudio) {
         const key = await window.aistudio.getKey();
         if (key) {
           setApiKey(key);
-          localStorage.setItem('gemini_api_key', key);
+          safeStorage.setItem('gemini_api_key', key);
         }
       }
     };
-    fetchData();
     fetchData();
   }, []);
 
   // Persist View State
   useEffect(() => {
-    localStorage.setItem('app_view', view);
+    safeStorage.setItem('app_view', view);
   }, [view]);
 
   // Persist Auth State
   useEffect(() => {
-    sessionStorage.setItem('admin_auth', isAdminAuthenticated.toString());
+    safeStorage.setSession('admin_auth', isAdminAuthenticated.toString());
   }, [isAdminAuthenticated]);
 
   const handleAdminLogin = (e: React.FormEvent) => {
