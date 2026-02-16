@@ -1250,15 +1250,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           try {
                             const courseId = c.id;
 
-                            // Update React state FIRST
+                            // CRITICAL FIX: Delete from Firebase FIRST and AWAIT completion
+                            console.log('🗑️ Deleting course from Firebase:', courseId);
+                            await dbService.deleteCourse(courseId);
+                            console.log('✅ Course deleted from Firebase');
+
+                            // NOW update React state (triggers auto-save with correct data)
                             setCourses(prev => prev.filter(x => x.id !== courseId));
                             setGrades(prev => prev.map(g => ({
                               ...g,
                               courses: g.courses.filter(cid => cid !== courseId)
                             })));
-
-                            // Then delete from Firebase
-                            await dbService.deleteCourse(courseId);
                           } catch (err) {
                             console.error(err);
                             alert("حدث خطأ أثناء حذف الكورس");
@@ -1657,7 +1659,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     const idToRemove = teacherToDelete.id;
                     const teacherName = teacherToDelete.name;
 
-                    // Update React state FIRST (before Firebase delete)
+                    // CRITICAL FIX: Delete from Firebase FIRST and AWAIT completion
+                    console.log('🗑️ Starting cascading delete for teacher:', idToRemove);
+                    const teacherCourses = courses.filter(c => c.teacherId === idToRemove);
+
+                    // Delete courses first
+                    if (teacherCourses.length > 0) {
+                      console.log('🗑️ Deleting', teacherCourses.length, 'courses...');
+                      await Promise.all(teacherCourses.map(c => dbService.deleteCourse(c.id)));
+                      console.log('✅ Courses deleted from Firebase');
+                    }
+
+                    // Then delete teacher
+                    console.log('🗑️ Deleting teacher from Firebase...');
+                    await dbService.deleteTeacher(idToRemove);
+                    console.log('✅ Teacher deleted from Firebase');
+
+                    // NOW update React state (this triggers auto-save, but docs are already deleted)
                     setTeachers(prev => prev.filter(t => t.id !== idToRemove));
                     setCourses(prev => prev.filter(c => c.teacherId !== idToRemove));
                     setGrades(prev => prev.map(grade => ({
