@@ -122,7 +122,14 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   grades, setGrades, teachers, setTeachers, courses, setCourses, onLogout, apiKey, setApiKey, anthropicApiKey, setAnthropicApiKey
 }) => {
-  const [activeTab, setActiveTab] = useState<'ai-schedule' | 'teachers' | 'subjects' | 'courses' | 'settings'>('ai-schedule');
+  const [activeTab, setActiveTab] = useState<'ai-schedule' | 'teachers' | 'subjects' | 'courses' | 'settings'>(() => {
+    return (localStorage.getItem('admin_active_tab') as any) || 'ai-schedule';
+  });
+
+  // Persist Admin Tab
+  useEffect(() => {
+    localStorage.setItem('admin_active_tab', activeTab);
+  }, [activeTab]);
   const [managementSubTab, setManagementSubTab] = useState<'list' | 'add' | 'ai-add'>('list');
   const [courseSubTab, setCourseSubTab] = useState<'list' | 'add'>('list');
 
@@ -1238,7 +1245,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <p className="text-gray-400 font-bold text-sm mb-6">{c.grade}</p>
                     <div className="flex gap-2 mt-auto">
                       <button onClick={() => setEditingCourse(c)} className="flex-1 bg-gray-50 text-[#0a192f] py-4 rounded-2xl font-black hover:bg-[#0a192f] hover:text-white transition-all shadow-sm">إدارة المحتوى 📂</button>
-                      <button onClick={() => { if (confirm('هل تود حذف هذا الكورس؟')) setCourses(prev => prev.filter(x => x.id !== c.id)) }} className="bg-red-50 p-4 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all">🗑️</button>
+                      <button onClick={async () => {
+                        if (confirm('هل تود حذف هذا الكورس؟')) {
+                          try {
+                            await dbService.deleteCourse(c.id);
+                            setCourses(prev => prev.filter(x => x.id !== c.id));
+                            // Also update grades to remove the course reference
+                            setGrades(prev => prev.map(g => ({
+                              ...g,
+                              courses: g.courses.filter(cid => cid !== c.id)
+                            })));
+                          } catch (err) {
+                            console.error(err);
+                            alert("حدث خطأ أثناء حذف الكورس");
+                          }
+                        }
+                      }} className="bg-red-50 p-4 rounded-2xl text-red-500 hover:bg-red-500 hover:text-white transition-all">🗑️</button>
                     </div>
                   </div>
                 </div>
@@ -1628,7 +1650,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex flex-col gap-3">
                 <button onClick={async () => {
                   try {
+                    // Cascading Delete: Delete all courses associated with this teacher
+                    const teacherCourses = courses.filter(c => c.teacherId === teacherToDelete.id);
+                    await Promise.all(teacherCourses.map(c => dbService.deleteCourse(c.id)));
+
                     await dbService.deleteTeacher(teacherToDelete.id);
+
                     const idToRemove = teacherToDelete.id;
                     setTeachers(prev => prev.filter(t => t.id !== idToRemove));
                     setCourses(prev => prev.filter(c => c.teacherId !== idToRemove));
