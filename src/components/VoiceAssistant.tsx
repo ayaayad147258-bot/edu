@@ -1,19 +1,86 @@
 import React, { useState, useEffect } from 'react';
-import { GradeData } from '../types';
+import { GradeData, Teacher, Course } from '../types';
 import { voiceManager } from '../services/VoiceManager';
+import { aiVoiceService, Message } from '../services/aiVoiceService';
+import { executeFunctionCall, AppContext } from '../services/voiceFunctions';
 
 interface VoiceAssistantProps {
-  onUpdateSchedule: (gradeId: string, text: string) => Promise<void>;
-  onAddTeacher: (text: string) => Promise<void>;
-  onNavigate: (view: 'home' | 'stages' | 'grade' | 'admin' | 'teachers') => void;
+  // State
   grades: GradeData[];
-  apiKey?: string; // Kept for compatibility if we want to add online mode back later, but currently unused/offline-focused
+  teachers: Teacher[];
+  courses: Course[];
+
+  // Setters
+  setGrades: (grades: GradeData[]) => void;
+  setTeachers: (teachers: Teacher[]) => void;
+  setCourses: (courses: Course[]) => void;
+
+  // Navigation
+  onNavigate: (view: 'home' | 'stages' | 'grade' | 'admin' | 'teachers') => void;
+
+  // API Key
+  apiKey?: string;
 }
 
-export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule, onAddTeacher, onNavigate, grades, apiKey }) => {
+export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
+  grades,
+  teachers,
+  courses,
+  setGrades,
+  setTeachers,
+  setCourses,
+  onNavigate,
+  apiKey,
+}) => {
   const [isActive, setIsActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [feedback, setFeedback] = useState("اضغط للتحدث");
+  const [isThinking, setIsThinking] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [feedback, setFeedback] = useState('اضغط للتحدث');
+  const [conversationHistory, setConversationHistory] = useState<Message[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Initialize AI when API key changes
+  useEffect(() => {
+    if (apiKey) {
+      aiVoiceService.initialize(apiKey);
+    }
+  }, [apiKey]);
+
+  // Helper functions for context
+  const findTeacher = (query: string): Teacher | null => {
+    const q = query.toLowerCase();
+    return teachers.find(
+      t => t.name.toLowerCase().includes(q) || t.subject.toLowerCase().includes(q)
+    ) || null;
+  };
+
+  const findCourse = (query: string): Course | null => {
+    const q = query.toLowerCase();
+    return courses.find(
+      c => c.title.toLowerCase().includes(q) || c.description.toLowerCase().includes(q)
+    ) || null;
+  };
+
+  const findGrade = (query: string): GradeData | null => {
+    const q = query.toLowerCase();
+    return grades.find(g => g.name.toLowerCase().includes(q)) || null;
+  };
+
+  // Build app context
+  const buildContext = (): AppContext => ({
+    grades,
+    teachers,
+    courses,
+    currentView: 'home',
+    setGrades,
+    setTeachers,
+    setCourses,
+    navigate: onNavigate,
+    findTeacher,
+    findCourse,
+    findGrade,
+  });
 
   useEffect(() => {
     let mounted = true;
@@ -21,65 +88,115 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule
     const processVoiceLoop = async () => {
       if (!isActive || !mounted) return;
 
-      setIsListening(true);
-      setFeedback("أستمع إليك... | Listening");
-
       try {
+        // 1. Listen to user
+        setIsListening(true);
+        setIsThinking(false);
+        setIsExecuting(false);
+        setFeedback('أستمع إليك... 🎤');
+
         const command = await voiceManager.listen();
         if (!mounted || !isActive) return;
 
         setIsListening(false);
         setFeedback(`سمعت: "${command}"`);
-        console.log("Voice Command:", command);
+        console.log('🎙️ Voice Command:', command);
 
-        // --- Command Processing Logic ---
-        const lowerCmd = command.toLowerCase();
+        // Add to history
+        setConversationHistory(prev => [
+          ...prev,
+          { role: 'user', parts: command },
+        ]);
 
-        if (lowerCmd.includes("جدول") || lowerCmd.includes("حصص")) {
-          await voiceManager.say("حاضر، سأقوم بفتح جدول الحصص للمراحل الدراسية.");
-          onNavigate('stages');
-        }
-        else if (lowerCmd.includes("تسجيل") || lowerCmd.includes("جديد")) {
-          await voiceManager.say("جاري تحويلك للصفحة الرئيسية للتسجيل.");
-          onNavigate('home');
-        }
-        else if (lowerCmd.includes("مدرسين") || lowerCmd.includes("معلمين")) {
-          await voiceManager.say("تفضل، هذه قائمة المدرسين لدينا.");
-          onNavigate('teachers');
-        }
-        else if (lowerCmd.includes("المعاصر") || lowerCmd.includes("كتب")) {
-          await voiceManager.say("كتب المعاصر متوفرة في قسم الرياضيات، هل أفتح لك القائمة؟");
-          console.log("Processing El-Moasser request...");
-        }
-        else {
-          // Default: Try to parse as admin command (Update/Add)
-          if (lowerCmd.includes("ضيف") || lowerCmd.includes("مدرس")) {
-            await voiceManager.say("جاري إضافة المدرس...");
-            await onAddTeacher(command);
-            await voiceManager.say("تمت المحاولة.");
-          } else if (lowerCmd.includes("حدث") || lowerCmd.includes("تغيير")) {
-            const grade = grades.find(g => command.includes(g.name));
-            if (grade) {
-              await voiceManager.say(`جاري تحديث جدول ${grade.name}`);
-              await onUpdateSchedule(grade.id, command);
-            } else {
-              await voiceManager.say("لم أتعرف على الصف الدراسي. يرجى التوضيح.");
-            }
-          } else {
-            await voiceManager.say("عذراً، لم أفهم الأمر. يمكنك قول: الجدول، أو تسجيل، أو المدرسين.");
+        // 2. Process with AI
+        if (!aiVoiceService.isReady()) {
+          // Fallback: No AI available
+          await voiceManager.say('عذراً، المساعد الذكي غير متاح. تأكد من إضافة API Key في الإعدادات.');
+          setFeedback('❌ المساعد الذكي غير متاح');
+
+          if (mounted && isActive) {
+            await new Promise(r => setTimeout(r, 2000));
+            processVoiceLoop();
           }
+          return;
+        }
+
+        setIsThinking(true);
+        setFeedback('جاري التفكير... 🧠');
+
+        const aiResponse = await aiVoiceService.processCommand(
+          command,
+          conversationHistory
+        );
+
+        if (!mounted || !isActive) return;
+        setIsThinking(false);
+
+        console.log('🤖 AI Response:', aiResponse);
+
+        // 3. Execute function calls if any
+        if (aiResponse.functionCalls && aiResponse.functionCalls.length > 0) {
+          setIsExecuting(true);
+          setFeedback('تنفيذ الأمر... ⚙️');
+
+          const context = buildContext();
+          const results = [];
+
+          for (const fc of aiResponse.functionCalls) {
+            const result = await executeFunctionCall(fc, context);
+            results.push(result);
+            console.log('✅ Function result:', result);
+          }
+
+          // Combine results for response
+          const successMessages = results
+            .filter(r => r.success)
+            .map(r => r.message)
+            .join('. ');
+
+          const failureMessages = results
+            .filter(r => !r.success)
+            .map(r => r.message)
+            .join('. ');
+
+          let finalMessage = aiResponse.text;
+          if (successMessages) {
+            finalMessage = successMessages;
+          }
+          if (failureMessages) {
+            finalMessage += (finalMessage ? '. ' : '') + failureMessages;
+          }
+
+          setIsExecuting(false);
+          setFeedback(finalMessage);
+          await voiceManager.say(finalMessage);
+
+          // Add to history
+          setConversationHistory(prev => [
+            ...prev,
+            { role: 'model', parts: finalMessage },
+          ]);
+        } else {
+          // No function calls, just speak the response
+          setFeedback(aiResponse.text);
+          await voiceManager.say(aiResponse.text);
+
+          // Add to history
+          setConversationHistory(prev => [
+            ...prev,
+            { role: 'model', parts: aiResponse.text },
+          ]);
         }
 
       } catch (error) {
-        // console.error("Voice Error:", error);
+        console.error('Voice Error:', error);
         if (mounted && isActive) {
-          setFeedback("لم أسمع جيداً...");
+          setFeedback('لم أسمع جيداً... 😕');
         }
       }
 
-      // Continuous loop check
+      // Continue loop
       if (mounted && isActive) {
-        // Small delay to prevent rapid loops on error
         await new Promise(r => setTimeout(r, 1000));
         processVoiceLoop();
       }
@@ -89,44 +206,116 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({ onUpdateSchedule
       processVoiceLoop();
     } else {
       setIsListening(false);
-      setFeedback("اضغط للتحدث");
-      // Ensure synth stops
+      setIsThinking(false);
+      setIsExecuting(false);
+      setFeedback('اضغط للتحدث');
       window.speechSynthesis.cancel();
     }
 
-    return () => { mounted = false; };
-  }, [isActive, onNavigate, onAddTeacher, onUpdateSchedule, grades]);
+    return () => {
+      mounted = false;
+    };
+  }, [isActive, conversationHistory, grades, teachers, courses]);
 
   const toggleAssistant = () => {
+    setIsActive(!isActive);
     if (isActive) {
-      setIsActive(false);
-    } else {
-      setIsActive(true);
+      // Reset history when closing
+      setConversationHistory([]);
     }
+  };
+
+  const getStatusIcon = () => {
+    if (isListening) return '🎤';
+    if (isThinking) return '🧠';
+    if (isExecuting) return '⚙️';
+    return '💬';
+  };
+
+  const getStatusColor = () => {
+    if (isListening) return 'bg-red-500';
+    if (isThinking) return 'bg-blue-500';
+    if (isExecuting) return 'bg-yellow-500';
+    return 'bg-gray-300';
   };
 
   return (
     <div className="fixed bottom-8 left-8 z-[100] flex flex-col items-end gap-4">
+      {/* Conversation Panel */}
       {isActive && (
-        <div className="rounded-3xl shadow-2xl p-6 w-72 border bg-white border-emerald-100 animate-in slide-in-from-bottom-4">
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`w-3 h-3 rounded-full ${isListening ? 'bg-red-500 animate-pulse' : 'bg-gray-300'}`}></div>
-            <span className="font-black text-emerald-600">
-              المساعد الذكي (Offline)
-            </span>
+        <div className="rounded-3xl shadow-2xl w-80 border bg-white border-emerald-100 animate-in slide-in-from-bottom-4 overflow-hidden">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-4 text-white">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${getStatusColor()} ${isListening || isThinking || isExecuting ? 'animate-pulse' : ''}`}></div>
+                <span className="font-black">
+                  {aiVoiceService.isReady() ? 'المساعد الذكي 🤖' : 'المساعد (بدون AI)'}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="text-white/80 hover:text-white text-sm"
+              >
+                {showHistory ? '📖' : '📝'}
+              </button>
+            </div>
           </div>
-          <p className="text-gray-600 text-sm font-bold leading-relaxed">
-            {feedback}
-          </p>
+
+          {/* Current Status */}
+          <div className="p-4 border-b">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">{getStatusIcon()}</span>
+              <p className="text-gray-700 text-sm font-bold leading-relaxed flex-1">
+                {feedback}
+              </p>
+            </div>
+          </div>
+
+          {/* Conversation History */}
+          {showHistory && conversationHistory.length > 0 && (
+            <div className="p-4 max-h-60 overflow-y-auto bg-gray-50">
+              <div className="space-y-3">
+                {conversationHistory.slice(-6).map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-xl text-sm ${msg.role === 'user'
+                        ? 'bg-blue-100 text-blue-900 mr-4'
+                        : 'bg-emerald-100 text-emerald-900 ml-4'
+                      }`}
+                  >
+                    <div className="font-bold text-xs mb-1">
+                      {msg.role === 'user' ? 'أنت' : 'المساعد'}
+                    </div>
+                    {msg.parts}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Quick Tips */}
+          {!showHistory && (
+            <div className="p-4 bg-gray-50 text-xs text-gray-600">
+              <div className="font-bold mb-2">💡 أمثلة:</div>
+              <div className="space-y-1">
+                <div>• "ضيف مدرس اسمه أحمد، رياضيات"</div>
+                <div>• "ورّيني قائمة المدرسين"</div>
+                <div>• "كام مدرس عندنا؟"</div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
+      {/* Toggle Button */}
       <button
         onClick={toggleAssistant}
         className={`w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 ${isActive
-          ? 'bg-red-500 text-white animate-pulse'
-          : 'bg-[#10b981] text-white hover:bg-emerald-600'
+            ? 'bg-red-500 text-white animate-pulse'
+            : 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600'
           }`}
+        title={isActive ? 'إيقاف المساعد' : 'تشغيل المساعد الصوتي'}
       >
         {isActive ? (
           <span className="text-3xl">✕</span>

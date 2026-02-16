@@ -147,13 +147,16 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-20 bg-gray-50 selection:bg-[#10b981] selection:text-white">
       <Navbar onNavigate={(v) => { setView(v); setSelectedStage(null); }} isAdmin={isAdminAuthenticated} />
 
-      {/* Voice Assistant for Admin */}
+      {/* Voice Assistant - Enhanced with AI */}
       {isAdminAuthenticated && (
         <VoiceAssistant
-          onUpdateSchedule={handleVoiceUpdateSchedule}
-          onAddTeacher={handleVoiceAddTeacher}
-          onNavigate={(v) => { setView(v); setSelectedStage(null); }}
           grades={grades}
+          teachers={teachers}
+          courses={courses}
+          setGrades={setGrades}
+          setTeachers={setTeachers}
+          setCourses={setCourses}
+          onNavigate={(v) => { setView(v); setSelectedStage(null); }}
           apiKey={apiKey}
         />
       )}
