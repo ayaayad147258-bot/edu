@@ -1277,14 +1277,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <input type="file" accept="image/*" onChange={e => setEditTeacherImage(e.target.files?.[0] || null)} className="absolute inset-0 opacity-0 cursor-pointer" />
                     </div>
                     <p className="text-sm font-bold text-gray-400 mt-2">اضغط لتغيير الصورة</p>
+                    <label className="block text-sm font-black text-gray-400 mb-2 mt-4 text-right">رابط الصورة (اختياري):</label>
                     <input
                       type="text"
-                      placeholder="أو ضع رابط الصورة هنا..."
-                      value={editingTeacher.imageUrl}
+                      placeholder="https://i.ibb.co/.../image.jpg"
+                      value={editingTeacher.imageUrl || ''}
                       onChange={(e) => setEditingTeacher({ ...editingTeacher, imageUrl: e.target.value })}
-                      className="w-full mt-4 bg-gray-50 border-2 border-gray-100 rounded-xl p-3 font-bold text-sm focus:border-[#10b981] outline-none text-center"
+                      className="w-full bg-gray-50 border-2 border-gray-100 rounded-xl p-3 font-bold text-sm focus:border-[#10b981] outline-none text-left"
                       dir="ltr"
                     />
+                    <p className="text-xs text-gray-400 mt-1 text-right">استخدم رابط مباشر (Direct Link) من ImgBB أو غيره.</p>
                   </div>
 
                   <div>
