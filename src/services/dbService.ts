@@ -113,81 +113,120 @@ export const dbService = {
   },
 
   async saveGrades(grades: GradeData[]) {
+    console.log('🔄 saveGrades called with', grades.length, 'grades');
     localStorage.setItem('academy_grades', JSON.stringify(grades));
     if (db) {
       try {
+        console.log('📤 Saving grades to Firebase...');
         const batch = writeBatch(db);
         grades.forEach(grade => {
           const gradeRef = doc(db, 'grades', grade.id);
           batch.set(gradeRef, cleanForFirestore(grade));
         });
         await batch.commit();
+        console.log('✅ Grades saved successfully to Firebase');
       } catch (err) {
-        console.error("Firebase Save Grades Error:", err);
+        console.error("❌ Firebase Save Grades Error:", err);
+        console.error("Error details:", { code: (err as any).code, message: (err as any).message });
       }
+    } else {
+      console.warn('⚠️ Firebase DB is not initialized - grades only saved to localStorage');
     }
   },
 
   async saveTeachers(teachers: Teacher[]) {
+    console.log('🔄 saveTeachers called with', teachers.length, 'teachers');
     localStorage.setItem('academy_teachers', JSON.stringify(teachers));
     if (db) {
       try {
+        console.log('📤 Saving teachers to Firebase...');
         const batch = writeBatch(db);
         teachers.forEach(teacher => {
           const teacherRef = doc(db, 'teachers', teacher.id);
           batch.set(teacherRef, cleanForFirestore(teacher));
         });
         await batch.commit();
+        console.log('✅ Teachers saved successfully to Firebase');
       } catch (err) {
-        console.error("Firebase Save Teachers Error:", err);
+        console.error("❌ Firebase Save Teachers Error:", err);
+        console.error("Error details:", { code: (err as any).code, message: (err as any).message });
       }
+    } else {
+      console.warn('⚠️ Firebase DB is not initialized - teachers only saved to localStorage');
     }
   },
 
   async saveCourses(courses: Course[]) {
+    console.log('🔄 saveCourses called with', courses.length, 'courses');
     localStorage.setItem('academy_courses', JSON.stringify(courses));
     if (db) {
       try {
+        console.log('📤 Saving courses to Firebase...');
         const batch = writeBatch(db);
         courses.forEach(course => {
           const courseRef = doc(db, 'courses', course.id);
           batch.set(courseRef, cleanForFirestore(course));
         });
         await batch.commit();
+        console.log('✅ Courses saved successfully to Firebase');
       } catch (err) {
-        console.error("Firebase Save Courses Error:", err);
+        console.error("❌ Firebase Save Courses Error:", err);
+        console.error("Error details:", { code: (err as any).code, message: (err as any).message });
       }
+    } else {
+      console.warn('⚠️ Firebase DB is not initialized - courses only saved to localStorage');
     }
   },
 
   async deleteTeacher(id: string) {
-    if (!db) return;
+    console.log('🗑️ deleteTeacher called for id:', id);
+    if (!db) {
+      console.warn('⚠️ Firebase DB is not initialized - cannot delete from Firebase');
+      return;
+    }
     try {
+      console.log('📤 Deleting teacher from Firebase...');
       await deleteDoc(doc(db, 'teachers', id));
+      console.log('✅ Teacher deleted successfully from Firebase');
     } catch (err) {
-      console.error("Firebase Delete Teacher Error:", err);
+      console.error("❌ Firebase Delete Teacher Error:", err);
+      console.error("Error details:", { code: (err as any).code, message: (err as any).message });
       throw err;
     }
   },
 
   async deleteCourse(id: string) {
-    if (!db) return;
+    console.log('🗑️ deleteCourse called for id:', id);
+    if (!db) {
+      console.warn('⚠️ Firebase DB is not initialized - cannot delete from Firebase');
+      return;
+    }
     try {
+      console.log('📤 Deleting course from Firebase...');
       await deleteDoc(doc(db, 'courses', id));
+      console.log('✅ Course deleted successfully from Firebase');
     } catch (err) {
-      console.error("Firebase Delete Course Error:", err);
+      console.error("❌ Firebase Delete Course Error:", err);
+      console.error("Error details:", { code: (err as any).code, message: (err as any).message });
       throw err;
     }
   },
 
   async loadData() {
+    console.log('📥 loadData called');
     const cached = {
       grades: JSON.parse(localStorage.getItem('academy_grades') || 'null'),
       teachers: JSON.parse(localStorage.getItem('academy_teachers') || 'null'),
       courses: JSON.parse(localStorage.getItem('academy_courses') || 'null'),
     };
+    console.log('💾 Cached data:', {
+      gradesCount: cached.grades?.length || 0,
+      teachersCount: cached.teachers?.length || 0,
+      coursesCount: cached.courses?.length || 0
+    });
 
     if (db) {
+      console.log('🔄 Firebase DB available, fetching remote data...');
       try {
         const [gradesSnap, teachersSnap, coursesSnap] = await Promise.all([
           getDocs(collection(db, 'grades')),
@@ -201,15 +240,26 @@ export const dbService = {
           courses: coursesSnap.docs.map((doc) => doc.data()) as Course[],
         };
 
+        console.log('✅ Remote data fetched:', {
+          gradesCount: remoteData.grades.length,
+          teachersCount: remoteData.teachers.length,
+          coursesCount: remoteData.courses.length
+        });
+
         // Always update cache and return remote data, even if empty (to handle deletions)
         localStorage.setItem('academy_grades', JSON.stringify(remoteData.grades));
         localStorage.setItem('academy_teachers', JSON.stringify(remoteData.teachers));
         localStorage.setItem('academy_courses', JSON.stringify(remoteData.courses));
+        console.log('💾 Cache updated with remote data');
         return remoteData;
 
       } catch (err) {
-        console.error("Firebase Load Error:", err);
+        console.error("❌ Firebase Load Error:", err);
+        console.error("Error details:", { code: (err as any).code, message: (err as any).message });
+        console.warn('⚠️ Falling back to cached data');
       }
+    } else {
+      console.warn('⚠️ Firebase DB is not initialized - using cached data only');
     }
 
     return cached;
