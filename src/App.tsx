@@ -34,10 +34,9 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       const data = await dbService.loadData();
-      // const data = await dbService.loadData(); // Removed duplicate
-      if (data.grades) setGrades(data.grades);
-      if (data.teachers) setTeachers(data.teachers);
-      if (data.courses) setCourses(data.courses);
+      if (data.grades) setGrades(data.grades.filter(g => g && g.id));
+      if (data.teachers) setTeachers(data.teachers.filter(t => t && t.id));
+      if (data.courses) setCourses(data.courses.filter(c => c && c.id));
 
       // Check for API Key (Project IDX / AI Studio)
       if (window.aistudio) {

@@ -226,7 +226,7 @@ export const GradeDetail: React.FC<GradeDetailProps> = ({ grade, teachers, cours
           {activeTab === 'courses' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in slide-in-from-left-8 duration-500">
               {gradeCourses.map(course => {
-                const teacher = teachers.find(t => t.id === course.teacherId);
+                // const teacher = teachers.find(t => t.id === course.teacherId);
                 return (
                   <div key={course.id} className="bg-white border-2 border-gray-100 rounded-[3.5rem] flex flex-col hover:border-[#f97316] transition-all group overflow-hidden shadow-sm hover:shadow-2xl active:scale-[0.98]">
                     <div className="h-64 overflow-hidden relative">
