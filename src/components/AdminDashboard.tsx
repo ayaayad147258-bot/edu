@@ -1248,13 +1248,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <button onClick={async () => {
                         if (confirm('هل تود حذف هذا الكورس؟')) {
                           try {
-                            await dbService.deleteCourse(c.id);
-                            setCourses(prev => prev.filter(x => x.id !== c.id));
-                            // Also update grades to remove the course reference
+                            const courseId = c.id;
+
+                            // Update React state FIRST
+                            setCourses(prev => prev.filter(x => x.id !== courseId));
                             setGrades(prev => prev.map(g => ({
                               ...g,
-                              courses: g.courses.filter(cid => cid !== c.id)
+                              courses: g.courses.filter(cid => cid !== courseId)
                             })));
+
+                            // Then delete from Firebase
+                            await dbService.deleteCourse(courseId);
                           } catch (err) {
                             console.error(err);
                             alert("حدث خطأ أثناء حذف الكورس");
@@ -1650,21 +1654,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex flex-col gap-3">
                 <button onClick={async () => {
                   try {
-                    // Cascading Delete: Delete all courses associated with this teacher
-                    const teacherCourses = courses.filter(c => c.teacherId === teacherToDelete.id);
-                    await Promise.all(teacherCourses.map(c => dbService.deleteCourse(c.id)));
-
-                    await dbService.deleteTeacher(teacherToDelete.id);
-
                     const idToRemove = teacherToDelete.id;
+                    const teacherName = teacherToDelete.name;
+
+                    // Update React state FIRST (before Firebase delete)
                     setTeachers(prev => prev.filter(t => t.id !== idToRemove));
                     setCourses(prev => prev.filter(c => c.teacherId !== idToRemove));
                     setGrades(prev => prev.map(grade => ({
                       ...grade,
                       teachers: grade.teachers.filter(tid => tid !== idToRemove)
                     })));
+
+                    // Close modal immediately
                     setTeacherToDelete(null);
-                    alert(`تم حذف المدرس "${teacherToDelete.name}" بنجاح.`);
+
+                    // Then delete from Firebase (async, won't interfere with auto-save)
+                    const teacherCourses = courses.filter(c => c.teacherId === idToRemove);
+                    await Promise.all(teacherCourses.map(c => dbService.deleteCourse(c.id)));
+                    await dbService.deleteTeacher(idToRemove);
+
+                    alert(`تم حذف المدرس "${teacherName}" بنجاح.`);
                   } catch (err) {
                     console.error(err);
                     alert("حدث خطأ أثناء حذف المدرس من قاعدة البيانات.");
