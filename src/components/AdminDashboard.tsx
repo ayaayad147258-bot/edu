@@ -1683,14 +1683,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       teachers: grade.teachers.filter(tid => tid !== idToRemove)
                     })));
 
-                    // Close modal immediately
                     setTeacherToDelete(null);
-
-                    // Then delete from Firebase (async, won't interfere with auto-save)
-                    const teacherCourses = courses.filter(c => c.teacherId === idToRemove);
-                    await Promise.all(teacherCourses.map(c => dbService.deleteCourse(c.id)));
-                    await dbService.deleteTeacher(idToRemove);
-
                     alert(`تم حذف المدرس "${teacherName}" بنجاح.`);
                   } catch (err) {
                     console.error(err);
