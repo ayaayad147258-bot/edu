@@ -15,7 +15,9 @@ import { VoiceAssistant } from './components/VoiceAssistant';
 
 const App: React.FC = () => {
   const [view, setView] = useState<'home' | 'stages' | 'grade' | 'admin' | 'teachers'>(() => {
-    return (localStorage.getItem('app_view') as any) || 'home';
+    const saved = localStorage.getItem('app_view');
+    const validViews = ['home', 'stages', 'grade', 'admin', 'teachers'];
+    return (saved && validViews.includes(saved)) ? (saved as any) : 'home';
   });
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
     return sessionStorage.getItem('admin_auth') === 'true';
