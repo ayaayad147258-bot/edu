@@ -111,11 +111,12 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         // 2. Process with AI
         if (!aiVoiceService.isReady()) {
           // Fallback: No AI available
-          await voiceManager.say('عذراً، المساعد الذكي غير متاح. تأكد من إضافة API Key في الإعدادات.');
-          setFeedback('❌ المساعد الذكي غير متاح');
+          const fallbackMsg = 'المساعد الذكي مش شغال. تأكد من إضافة API Key. افتح F12 → Console واكتب: localStorage.setItem("gemini_api_key", "YOUR_KEY")';
+          await voiceManager.say(fallbackMsg);
+          setFeedback('❌ ' + fallbackMsg);
 
           if (mounted && isActive) {
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 3000));
             processVoiceLoop();
           }
           return;
