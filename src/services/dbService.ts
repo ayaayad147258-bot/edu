@@ -201,12 +201,12 @@ export const dbService = {
           courses: coursesSnap.docs.map((doc) => doc.data()) as Course[],
         };
 
-        if (remoteData.grades.length > 0 || remoteData.teachers.length > 0 || remoteData.courses.length > 0) {
-          localStorage.setItem('academy_grades', JSON.stringify(remoteData.grades));
-          localStorage.setItem('academy_teachers', JSON.stringify(remoteData.teachers));
-          localStorage.setItem('academy_courses', JSON.stringify(remoteData.courses));
-          return remoteData;
-        }
+        // Always update cache and return remote data, even if empty (to handle deletions)
+        localStorage.setItem('academy_grades', JSON.stringify(remoteData.grades));
+        localStorage.setItem('academy_teachers', JSON.stringify(remoteData.teachers));
+        localStorage.setItem('academy_courses', JSON.stringify(remoteData.courses));
+        return remoteData;
+
       } catch (err) {
         console.error("Firebase Load Error:", err);
       }

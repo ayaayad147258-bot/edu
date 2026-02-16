@@ -14,8 +14,12 @@ import { parseScheduleWithAI, parseTeachersWithAI } from './services/geminiServi
 import { VoiceAssistant } from './components/VoiceAssistant';
 
 const App: React.FC = () => {
-  const [view, setView] = useState<'home' | 'stages' | 'grade' | 'admin' | 'teachers'>('home');
-  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [view, setView] = useState<'home' | 'stages' | 'grade' | 'admin' | 'teachers'>(() => {
+    return (localStorage.getItem('app_view') as any) || 'home';
+  });
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => {
+    return sessionStorage.getItem('admin_auth') === 'true';
+  });
   const [adminPassword, setAdminPassword] = useState('');
   const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_api_key') || '');
   const [anthropicApiKey, setAnthropicApiKey] = useState(localStorage.getItem('anthropic_api_key') || '');
@@ -30,9 +34,10 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       const data = await dbService.loadData();
-      if (data.grades && data.grades.length > 0) setGrades(data.grades);
-      if (data.teachers && data.teachers.length > 0) setTeachers(data.teachers);
-      if (data.courses && data.courses.length > 0) setCourses(data.courses);
+      // const data = await dbService.loadData(); // Removed duplicate
+      if (data.grades) setGrades(data.grades);
+      if (data.teachers) setTeachers(data.teachers);
+      if (data.courses) setCourses(data.courses);
 
       // Check for API Key (Project IDX / AI Studio)
       if (window.aistudio) {
@@ -44,7 +49,18 @@ const App: React.FC = () => {
       }
     };
     fetchData();
+    fetchData();
   }, []);
+
+  // Persist View State
+  useEffect(() => {
+    localStorage.setItem('app_view', view);
+  }, [view]);
+
+  // Persist Auth State
+  useEffect(() => {
+    sessionStorage.setItem('admin_auth', isAdminAuthenticated.toString());
+  }, [isAdminAuthenticated]);
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
