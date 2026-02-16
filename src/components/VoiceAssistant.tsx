@@ -191,7 +191,13 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       } catch (error) {
         console.error('Voice Error:', error);
         if (mounted && isActive) {
-          setFeedback('لم أسمع جيداً... 😕');
+          const errorMsg = typeof error === 'string' ? error : 'لم أسمع جيداً... 😕';
+          setFeedback(errorMsg);
+
+          // Don't speak error messages that are informational
+          if (typeof error === 'string' && !error.includes('timeout')) {
+            await voiceManager.say(error);
+          }
         }
       }
 
@@ -280,8 +286,8 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
                   <div
                     key={idx}
                     className={`p-3 rounded-xl text-sm ${msg.role === 'user'
-                        ? 'bg-blue-100 text-blue-900 mr-4'
-                        : 'bg-emerald-100 text-emerald-900 ml-4'
+                      ? 'bg-blue-100 text-blue-900 mr-4'
+                      : 'bg-emerald-100 text-emerald-900 ml-4'
                       }`}
                   >
                     <div className="font-bold text-xs mb-1">
@@ -312,8 +318,8 @@ export const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       <button
         onClick={toggleAssistant}
         className={`w-20 h-20 rounded-full flex items-center justify-center shadow-2xl transition-all active:scale-90 ${isActive
-            ? 'bg-red-500 text-white animate-pulse'
-            : 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600'
+          ? 'bg-red-500 text-white animate-pulse'
+          : 'bg-gradient-to-br from-emerald-500 to-teal-500 text-white hover:from-emerald-600 hover:to-teal-600'
           }`}
         title={isActive ? 'إيقاف المساعد' : 'تشغيل المساعد الصوتي'}
       >
