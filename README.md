@@ -1,20 +1,56 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+  <img src="src/assets/logo.png" alt="Educators Academy Logo" width="200" />
+  <h1>Educators Academy Platform 🎓</h1>
+  <p><strong>المنصة التعليمية المتكاملة لإدارة الطلاب، الجدول الدراسي، والمحتوى التعليمي باستخدام الذكاء الاصطناعي.</strong></p>
+  
+  [![Deploy Status](https://github.com/ayaayad147258-bot/edu/actions/workflows/pages/pages-build-deployment/badge.svg)](https://github.com/ayaayad147258-bot/edu/actions/workflows/pages/pages-build-deployment)
+  <br />
+  <a href="https://ayaayad147258-bot.github.io/edu/"><strong>🌐 زيارة الموقع الرسمي</strong></a>
 </div>
 
-# Run and deploy your AI Studio app
+---
 
-This contains everything you need to run your app locally.
+## 🌟 مميزات المنصة
 
-View your app in AI Studio: https://ai.studio/apps/drive/1DotMvpM01N4LSz3QlrtiZaSXWTAqOdwa
+### 🤖 الذكاء الاصطناعي (AI)
+- **إنشاء الجدول الدراسي**: توليد جداول دراسية ذكية بناءً على المدخلات النصية.
+- **إضافة المدرسين**: تحليل نصوص المحادثات لاستخراج بيانات المدرسين وإضافتهم تلقائياً.
+- **توليد أغلفة الكورسات**: تصميم صور احترافية للكورسات باستخدام Google Gemini.
 
-## Run Locally
+### 📅 إدارة الجداول
+- **الجدول اليدوي**: واجهة سحب وإفلات لبناء الجداول.
+- **جدول رمضان**: دعم خاص لتوقيتات شهر رمضان.
+- **تنسيق 12 ساعة**: عرض الأوقات بنظام "صباحاً/مساءً".
 
-**Prerequisites:**  Node.js
+### 📚 إدارة المحتوى
+- **الكورسات**: رفع فيديوهات، ملفات PDF، وصور.
+- **المدرسين**: إدارة بيانات المدرسين، المراحل، والأسعار.
+- **الحذف المتزامن**: حذف البيانات من التطبيق وقاعدة البيانات (Firebase) في آن واحد.
 
+### ⚡ الأداء والتقنية
+- **PWA**: تطبيق ويب تقدمي يعمل كـ Native App.
+- **Firebase**: قاعدة بيانات سحابية وتخزين ملفات.
+- **Offline Support**: دعم العمل الأساسي بدون إنترنت.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🚀 التشغيل محلياً (Development)
+
+1. **تثبيت المكتبات:**
+   ```bash
+   npm install
+   ```
+
+2. **تشغيل السيرفر:**
+   ```bash
+   npm run dev
+   ```
+
+3. **بناء النسخة النهائية:**
+   ```bash
+   npm run build
+   ```
+
+---
+
+<div align="center">
+  <p>تم التطوير بواسطة <strong>Educators Academy Tech Team</strong> 💻</p>
+</div>
